@@ -40,12 +40,102 @@ function form_lines(array $post, string $key, array $old): array {
   return $v !== '' ? lines($v) : $old;
 }
 
+/** Sidebar navigasi admin: Pengaturan + daftar section. */
+function render_admin_sidebar(array $sections, string $activeKey): void {
+  $act = function (?string $k) use ($activeKey): string {
+    return $k === $activeKey ? ' adm-sb-item-active' : '';
+  };
+  ?>
+  <aside class="adm-sidebar">
+    <a class="adm-sb-item<?php echo $act('__site'); ?>" href="<?php echo app_url('admin?s=__site'); ?>">
+      <i class="fa-solid fa-sliders adm-sb-ico"></i><span class="adm-sb-nm">Pengaturan Halaman</span>
+    </a>
+    <div class="adm-sb-sep"></div>
+    <?php foreach ($sections as $key => $kc): ?>
+      <a class="adm-sb-item<?php echo $act($key); ?>" href="<?php echo app_url('admin?s=' . urlencode($key)); ?>">
+        <i class="<?php echo htmlspecialchars(lget($kc, 'icon', 'fa-solid fa-file')); ?> adm-sb-ico"></i>
+        <span class="adm-sb-nm"><?php echo htmlspecialchars(lget($kc, 'name', $key)); ?></span>
+      </a>
+    <?php endforeach; ?>
+    <button type="button" class="adm-sb-add" id="sbAddBtn"><i class="fa-solid fa-plus"></i> Tambah Section</button>
+    <div id="sbAddForm" class="adm-sb-addform" hidden>
+      <form method="POST" action="<?php echo app_url('admin'); ?>">
+        <?php echo csrf_field(); ?>
+        <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
+        <input type="hidden" name="action" value="add_section">
+        <input type="text" name="new_slug" class="input-gms" placeholder="Slug (cth: baptisan_anak)" required>
+        <input type="text" name="new_name" class="input-gms" placeholder="Nama (cth: Baptisan Anak)" required>
+        <input type="text" name="new_icon" class="input-gms" placeholder="Ikon (opsional, cth: fa-solid fa-baby)">
+        <button type="submit" class="btn-gms-pill w-full justify-center"><i class="fa-solid fa-plus"></i> Buat Section</button>
+      </form>
+    </div>
+  </aside>
+  <?php
+}
+
+/** Kartu pengaturan global (judul, welcome, footer). */
+function render_site_settings(): void {
+  $site = $GLOBALS['site'] ?? [];
+  ?>
+  <details class="card-gms adm-block" data-has="1" open>
+    <summary>
+      <span class="adm-sum-icon"><i class="fa-solid fa-sliders"></i></span>
+      <span class="adm-title">Setting Halaman</span>
+      <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
+    </summary>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="label-gms">Judul Halaman</label>
+        <input type="text" name="site_title" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'title')); ?>">
+      </div>
+      <div>
+        <label class="label-gms">Sub Judul</label>
+        <input type="text" name="site_subtitle" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'subtitle')); ?>">
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="label-gms">Welcome Heading</label>
+        <input type="text" name="site_welcome_heading" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'welcome_heading')); ?>">
+      </div>
+      <div>
+        <label class="label-gms">Welcome Text</label>
+        <input type="text" name="site_welcome_text" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'welcome_text')); ?>">
+      </div>
+    </div>
+    <div class="mb-4">
+      <label class="label-gms">Welcome Intro</label>
+      <textarea name="site_welcome_intro" class="input-gms" rows="2"><?php echo htmlspecialchars(lget($site, 'welcome_intro')); ?></textarea>
+    </div>
+    <div class="mb-4">
+      <label class="label-gms">Welcome Notes (satu baris per item)</label>
+      <textarea name="site_welcome_notes" class="input-gms" rows="4" data-row-editor="lines" data-ph="Catatan / salam"><?php echo htmlspecialchars(implode("\n", lget($site, 'welcome_notes', []))); ?></textarea>
+    </div>
+    <div class="mb-4">
+      <label class="label-gms">Welcome Closing</label>
+      <textarea name="site_welcome_closing" class="input-gms" rows="2"><?php echo htmlspecialchars(lget($site, 'welcome_closing')); ?></textarea>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="label-gms">Footer Text</label>
+        <input type="text" name="site_footer_text" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'footer_text')); ?>">
+      </div>
+      <div>
+        <label class="label-gms">Copyright</label>
+        <input type="text" name="site_copyright" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'copyright')); ?>">
+      </div>
+    </div>
+  </details>
+  <?php
+}
+
 $sections = lget($content, 'sections', []);
 $activeKey = isset($_GET['s']) ? $_GET['s'] : '';
 if (!isset($sections[$activeKey])) {
   $activeKey = $sections ? array_key_first($sections) : '';
 }
 $sec = $sections[$activeKey] ?? [];
+$viewSites = isset($_GET['s']) && $_GET['s'] === '__site';
 
 $message = '';
 $error = '';
@@ -347,6 +437,64 @@ $site = lget($content, 'site', []);
     details.adm-block.adm-block-sub > summary { padding: 10px 12px; border-bottom: none; margin-bottom: 0; }
     details.adm-block.adm-block-sub[open] > summary { border-bottom: 1px solid #eef2f7; }
     details.adm-block.adm-block-sub > summary .adm-sum-icon { background: #003399; }
+
+    /* ===== Row editor (google-sites style) ===== */
+    .row-editor { margin-top: 10px; }
+    .row-editor-list { margin-bottom: 2px; }
+    .row-editor-item { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .row-editor-item .row-inp { flex: 1; min-width: 0; margin: 0; }
+    .row-del {
+      flex-shrink: 0; width: 38px; height: 42px; border-radius: 10px;
+      border: 1px solid #fee2e2; background: #fef2f2; color: #dc2626;
+      cursor: pointer; font-size: 14px;
+    }
+    .row-del:hover { background: #fee2e2; }
+    .row-add {
+      width: 100%; padding: 11px 14px; border-radius: 12px;
+      border: 1.5px dashed #c3d2ec; background: #f8fafc; color: #0052cc;
+      font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    .row-add:hover { background: #eef3fb; border-color: #0052cc; }
+
+    /* ===== Shell admin: sidebar + konten ===== */
+    .adm-shell { display: grid; grid-template-columns: 252px 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 860px) {
+      .adm-shell { grid-template-columns: 1fr; }
+      .adm-sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
+      .adm-sidebar .adm-sb-sep { display: none; }
+      .adm-sidebar .adm-sb-add { width: auto; margin-top: 6px; }
+      .adm-sidebar .adm-sb-addform { width: 100%; }
+    }
+    .adm-sidebar {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+      padding: 12px; position: sticky; top: 12px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .adm-sb-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 12px;
+      color: #18233b; font-weight: 700; font-size: 13px;
+      text-decoration: none; border: 1px solid transparent;
+    }
+    .adm-sb-item:hover { background: #f1f5f9; }
+    .adm-sb-item-active { background: var(--gms-gradient, linear-gradient(135deg, #0052cc, #003399)); color: #fff; }
+    .adm-sb-item-active i { color: #fff; }
+    .adm-sb-ico { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; color: #0052cc; }
+    .adm-sb-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .adm-sb-sep { height: 1px; background: #eef1f5; margin: 8px 2px; }
+    .adm-sb-add {
+      width: 100%; margin-top: 10px; padding: 10px 12px;
+      border: 1.5px dashed #c3d2ec; border-radius: 12px; background: #f8fafc;
+      color: #0052cc; font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    .adm-sb-add:hover { background: #eef3fb; border-color: #0052cc; }
+    .adm-sb-addform {
+      margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 12px;
+      padding: 12px; background: #f8fafc;
+    }
+    .adm-sb-addform .input-gms { margin-bottom: 8px; }
+    .adm-sb-addform .btn-gms-pill { margin-top: 2px; }
+    .adm-main { min-width: 0; }
   </style>
 </head>
 <body>
@@ -376,48 +524,6 @@ $site = lget($content, 'site', []);
       <div class="blue-indicator"></div>
     </div>
 
-    <!-- PILIH SECTION -->
-    <div class="card-gms !pb-3">
-      <p class="label-gms">Pilih Section yang Diedit</p>
-      <div class="flex flex-wrap gap-2">
-        <?php foreach ($sections as $key => $kc): ?>
-          <a href="<?php echo app_url('admin?s=' . urlencode($key)); ?>"
-             class="btn-switch <?php echo $key === $activeKey ? 'btn-switch-active' : 'btn-switch-inactive'; ?>">
-            <i class="<?php echo htmlspecialchars(lget($kc, 'icon', 'fa-solid fa-file')); ?>"></i>
-            <?php echo htmlspecialchars(lget($kc, 'name', $key)); ?>
-          </a>
-        <?php endforeach; ?>
-      </div>
-    </div>
-
-    <!-- TAMBAH SECTION -->
-    <div class="card-gms !pb-3 mt-3">
-      <p class="label-gms">Tambah Section Baru</p>
-      <form method="POST" action="<?php echo app_url('admin'); ?>">
-        <?php echo csrf_field(); ?>
-        <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
-        <input type="hidden" name="action" value="add_section">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-          <div>
-            <label class="label-gms">Slug</label>
-            <input type="text" name="new_slug" class="input-gms" value="" placeholder="cth: baptisan_anak">
-          </div>
-          <div>
-            <label class="label-gms">Nama</label>
-            <input type="text" name="new_name" class="input-gms" value="" placeholder="cth: Baptisan Anak">
-          </div>
-          <div>
-            <label class="label-gms">Ikon (Font Awesome)</label>
-            <input type="text" name="new_icon" class="input-gms" value="" placeholder="fa-solid fa-baby">
-          </div>
-        </div>
-        <p class="hint-gms mb-3">Slug: huruf kecil, angka, dan underscore saja (tanpa spasi). Ikon boleh dikosongkan (dipakai ikon default).</p>
-        <div class="flex justify-end">
-          <button type="submit" class="btn-gms-pill"><i class="fa-solid fa-plus"></i> Tambah Section</button>
-        </div>
-      </form>
-    </div>
-
     <?php if ($message): ?>
       <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl p-3 mb-4">
         <i class="fa-solid fa-circle-check mr-1"></i><?php echo $message; ?>
@@ -429,97 +535,54 @@ $site = lget($content, 'site', []);
       </div>
     <?php endif; ?>
 
-    <!-- TAMPILAN FORM -->
-    <div class="card-gms !pb-3">
-      <p class="label-gms mb-2">Tampilan Form Isi</p>
-      <div class="flex flex-wrap gap-2" id="admView">
-        <button type="button" class="btn-switch btn-switch-active" data-adm-mode="filled"><i class="fa-solid fa-filter"></i> Hanya Terisi</button>
-        <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="all"><i class="fa-solid fa-circle-plus"></i> Buka Semua</button>
-        <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="none"><i class="fa-solid fa-circle-minus"></i> Tutup Semua</button>
-      </div>
-      <p class="hint-gms mb-0">Field yang belum diisi disembunyikan agar form ringkas. Pilih "Buka Semua" bila ingin mengisi field baru (mengosongkan kolom tidak menghapus nilai lama).</p>
-    </div>
+    <div class="adm-shell">
+      <?php render_admin_sidebar($sections, $viewSites ? '__site' : $activeKey); ?>
 
-    <form method="POST" action="<?php echo app_url('admin?s=' . urlencode($activeKey)); ?>" enctype="multipart/form-data">
-      <?php echo csrf_field(); ?>
-      <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
-      <input type="hidden" name="has_visibility" value="1">
-      <input type="hidden" name="action" value="save">
-      <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
+      <div class="adm-main">
+        <?php if ($viewSites): ?>
 
-      <!-- VISIBILITAS SECTION -->
-      <details class="card-gms adm-block" data-has="1" open>
-        <summary>
-          <span class="adm-sum-icon"><i class="fa-solid fa-eye-slash"></i></span>
-          <span class="adm-title">Visibilitas Section</span>
-          <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-        </summary>
-        <p class="text-xs text-[#5e6d82] m-0 mb-4">Section yang dinonaktifkan tidak akan tampil di halaman publik.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="card-gms !pb-3 mb-3">
+          <p class="label-gms m-0"><i class="fa-solid fa-sliders mr-1 text-[#0052cc]"></i> Pengaturan Halaman — berlaku untuk seluruh halaman publik</p>
+        </div>
+        <form method="POST" action="<?php echo app_url('admin?s=__site'); ?>">
+          <?php echo csrf_field(); ?>
+          <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
+          <input type="hidden" name="action" value="save">
+          <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
           <?php foreach ($sections as $sk => $sv): ?>
-            <label class="flex items-center justify-between gap-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3 cursor-pointer select-none">
-              <span class="flex items-center gap-2 text-sm font-bold text-[#18233b]">
-                <i class="<?php echo htmlspecialchars(lget($sv, 'icon', 'fa-solid fa-file')); ?> text-[#0052cc]"></i>
-                <?php echo htmlspecialchars(lget($sv, 'name', $sk)); ?>
-              </span>
-              <input type="checkbox" name="visible_<?php echo htmlspecialchars($sk); ?>" value="1" class="sr-only"
-                     <?php echo lget($sv, 'visible', true) ? 'checked' : ''; ?>>
-              <span class="switch"></span>
-            </label>
+            <input type="hidden" name="visible_<?php echo htmlspecialchars($sk); ?>" value="<?php echo lget($sv, 'visible', true) ? '1' : '0'; ?>">
           <?php endforeach; ?>
-        </div>
-      </details>
+          <?php render_site_settings(); ?>
+          <div class="card-gms flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <p class="text-xs text-[#5e6d82] m-0">Perubahan langsung tampil di halaman publik setelah disimpan.</p>
+            <button type="submit" class="btn-gms-pill"><i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan</button>
+          </div>
+        </form>
 
-      <!-- SETTING GLOBAL -->
-      <details class="card-gms adm-block" data-has="1" open>
-        <summary>
-          <span class="adm-sum-icon"><i class="fa-solid fa-sliders"></i></span>
-          <span class="adm-title">Setting Halaman</span>
-          <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-        </summary>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="label-gms">Judul Halaman</label>
-            <input type="text" name="site_title" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'title')); ?>">
+        <?php else: ?>
+
+        <!-- TAMPILAN FORM -->
+        <div class="card-gms !pb-3 mb-3">
+          <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Form Isi: <?php echo htmlspecialchars(lget($sec, 'name', $activeKey)); ?></p>
+          <div class="flex flex-wrap gap-2" id="admView">
+            <button type="button" class="btn-switch btn-switch-active" data-adm-mode="filled"><i class="fa-solid fa-filter"></i> Hanya Terisi</button>
+            <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="all"><i class="fa-solid fa-circle-plus"></i> Buka Semua</button>
+            <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="none"><i class="fa-solid fa-circle-minus"></i> Tutup Semua</button>
           </div>
-          <div>
-            <label class="label-gms">Sub Judul</label>
-            <input type="text" name="site_subtitle" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'subtitle')); ?>">
-          </div>
+          <p class="hint-gms mb-0">Field yang belum diisi disembunyikan agar form ringkas. Pilih "Buka Semua" bila ingin mengisi field baru (mengosongkan kolom tidak menghapus nilai lama).</p>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="label-gms">Welcome Heading</label>
-            <input type="text" name="site_welcome_heading" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'welcome_heading')); ?>">
-          </div>
-          <div>
-            <label class="label-gms">Welcome Text</label>
-            <input type="text" name="site_welcome_text" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'welcome_text')); ?>">
-          </div>
-        </div>
-        <div class="mb-4">
-          <label class="label-gms">Welcome Intro</label>
-          <textarea name="site_welcome_intro" class="input-gms" rows="2"><?php echo htmlspecialchars(lget($site, 'welcome_intro')); ?></textarea>
-        </div>
-        <div class="mb-4">
-          <label class="label-gms">Welcome Notes (satu baris per item)</label>
-          <textarea name="site_welcome_notes" class="input-gms" rows="4"><?php echo htmlspecialchars(implode("\n", lget($site, 'welcome_notes', []))); ?></textarea>
-        </div>
-        <div class="mb-4">
-          <label class="label-gms">Welcome Closing</label>
-          <textarea name="site_welcome_closing" class="input-gms" rows="2"><?php echo htmlspecialchars(lget($site, 'welcome_closing')); ?></textarea>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="label-gms">Footer Text</label>
-            <input type="text" name="site_footer_text" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'footer_text')); ?>">
-          </div>
-          <div>
-            <label class="label-gms">Copyright</label>
-            <input type="text" name="site_copyright" class="input-gms" value="<?php echo htmlspecialchars(lget($site, 'copyright')); ?>">
-          </div>
-        </div>
-      </details>
+
+        <form method="POST" action="<?php echo app_url('admin?s=' . urlencode($activeKey)); ?>" enctype="multipart/form-data">
+          <?php echo csrf_field(); ?>
+          <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
+          <input type="hidden" name="has_visibility" value="1">
+          <input type="hidden" name="action" value="save">
+          <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
+          <?php foreach ($sections as $sk => $sv): ?>
+            <input type="hidden" name="visible_<?php echo htmlspecialchars($sk); ?>" value="<?php echo lget($sv, 'visible', true) ? '1' : '0'; ?>">
+          <?php endforeach; ?>
+
+          <!-- IDENTITAS SECTION -->
 
       <!-- IDENTITAS SECTION -->
       <details class="card-gms adm-block" data-has="1" open>
@@ -626,8 +689,10 @@ $site = lget($content, 'site', []);
                   ?>
                   <div class="<?php echo in_array($sfType, ['lines', 'pairs'], true) ? 'md:col-span-2' : ''; ?> mb-3">
                     <label class="label-gms"><?php echo htmlspecialchars($sfLabel); ?></label>
-                    <?php if ($sfType === 'lines' || $sfType === 'pairs'): ?>
-                    <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3"><?php echo htmlspecialchars($svPre); ?></textarea>
+                    <?php if ($sfType === 'lines'): ?>
+                    <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="lines" data-ph="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
+                    <?php elseif ($sfType === 'pairs'): ?>
+                    <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="pairs" data-ph1="Judul" data-ph2="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
                     <?php elseif ($sfType === 'int'): ?>
                     <input type="number" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
                     <?php else: ?>
@@ -655,7 +720,7 @@ $site = lget($content, 'site', []);
         <?php foreach ($kbSecFields as $sf): ?>
         <div class="mb-4">
           <label class="label-gms"><?php echo htmlspecialchars(lget($sf, 'label')); ?></label>
-          <textarea name="sec_<?php echo htmlspecialchars(lget($sf, 'field')); ?>" class="input-gms" rows="6"><?php echo htmlspecialchars(implode("\n", lget($sec, lget($sf, 'field'), []))); ?></textarea>
+          <textarea name="sec_<?php echo htmlspecialchars(lget($sf, 'field')); ?>" class="input-gms" rows="6" data-row-editor="lines" data-ph="Langkah"><?php echo htmlspecialchars(implode("\n", lget($sec, lget($sf, 'field'), []))); ?></textarea>
         </div>
         <?php endforeach; ?>
       </details>
@@ -671,8 +736,8 @@ $site = lget($content, 'site', []);
           <span class="adm-sum-hint"><?php echo $linkHas ? 'terisi' : 'kosong'; ?></span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <label class="label-gms">Link Tutorial (satu baris per link, format: Label &lt;TAB&gt; URL)</label>
-        <textarea name="links_raw" class="input-gms" rows="4"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
+        <label class="label-gms">Link Tutorial (tiap baris = satu link)</label>
+        <textarea name="links_raw" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
       </details>
       <?php endif; ?>
 
@@ -685,8 +750,8 @@ $site = lget($content, 'site', []);
           <span class="adm-sum-hint"><?php echo $faqHas ? count(lget($sec, 'faq', [])) . ' item' : 'kosong'; ?></span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <label class="label-gms">FAQ Items (satu baris per item, format: Pertanyaan &lt;TAB&gt; Jawaban)</label>
-        <textarea name="faq_items" class="input-gms" rows="8"><?php
+        <label class="label-gms">FAQ (tiap baris = satu Tanya-Jawab)</label>
+        <textarea name="faq_items" class="input-gms" rows="8" data-row-editor="pairs" data-ph1="Pertanyaan" data-ph2="Jawaban"><?php
           $faqArr = lget($sec, 'faq', []);
           $faqLines = [];
           foreach ($faqArr as $fq) {
@@ -694,7 +759,7 @@ $site = lget($content, 'site', []);
           }
           echo htmlspecialchars(implode("\n", $faqLines));
         ?></textarea>
-        <p class="hint-gms">Contoh: Bagaimana cara daftar?&lt;TAB&gt;Buka aplikasi GMS Church lalu pilih menu MSJ. (Pemisahnya tombol Tab, bukan tanda kurung siku.)</p>
+        <p class="hint-gms">Tiap baris = satu pasangan pertanyaan-jawaban. Klik "+ Tambah" untuk menambah baris baru.</p>
       </details>
 
       <!-- SUBMIT -->
@@ -706,6 +771,10 @@ $site = lget($content, 'site', []);
       </div>
 
     </form>
+
+        <?php endif; ?>
+      </div>
+    </div>
 
   </main>
 
@@ -734,6 +803,96 @@ $site = lget($content, 'site', []);
         });
       }
       applyMode('filled');
+    })();
+
+    (function () {
+      function editor(ta) {
+        if (ta._rowEditorReady) return;
+        ta._rowEditorReady = true;
+        var pairs = ta.getAttribute('data-row-editor') === 'pairs';
+        var cols = pairs ? 2 : 1;
+        var ph = [
+          ta.getAttribute('data-ph1') || (pairs ? 'Label / Pertanyaan' : 'Isi'),
+          ta.getAttribute('data-ph2') || 'URL / Jawaban'
+        ];
+        var rows = [];
+        String(ta.value).split('\n').forEach(function (ln) {
+          var p = ln.split('\t');
+          var r = [];
+          for (var c = 0; c < cols; c++) r.push(p[c] !== undefined ? p[c] : '');
+          if (r.join('').replace(/\t/g, '').trim() !== '') rows.push(r);
+        });
+
+        var wrap = document.createElement('div');
+        wrap.className = 'row-editor';
+        var list = document.createElement('div');
+        list.className = 'row-editor-list';
+        wrap.appendChild(list);
+
+        function sync() {
+          var out = [];
+          rows.forEach(function (r) {
+            if (r.join('').replace(/\t/g, '').trim() !== '') out.push(r.join('\t'));
+          });
+          ta.value = out.join('\n');
+        }
+        function render() {
+          list.innerHTML = '';
+          rows.forEach(function (r, i) {
+            var item = document.createElement('div');
+            item.className = 'row-editor-item';
+            for (var c = 0; c < cols; c++) (function (c) {
+              var inp = document.createElement('input');
+              inp.type = 'text';
+              inp.className = 'input-gms row-inp';
+              inp.placeholder = ph[c];
+              inp.value = r[c] || '';
+              inp.addEventListener('input', function () { r[c] = this.value; sync(); });
+              item.appendChild(inp);
+            })(c);
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'row-del';
+            del.title = 'Hapus baris';
+            del.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            del.addEventListener('click', function () { rows.splice(i, 1); render(); });
+            item.appendChild(del);
+            list.appendChild(item);
+          });
+          sync();
+        }
+
+        var addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'row-add';
+        addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Tambah';
+        addBtn.addEventListener('click', function () {
+          var r = [];
+          for (var c = 0; c < cols; c++) r.push('');
+          rows.push(r);
+          render();
+        });
+        wrap.appendChild(addBtn);
+
+        ta.insertAdjacentElement('afterend', wrap);
+        ta.style.display = 'none';
+        render();
+      }
+      document.querySelectorAll('[data-row-editor]').forEach(editor);
+    })();
+
+    (function () {
+      var btn = document.getElementById('sbAddBtn');
+      var frm = document.getElementById('sbAddForm');
+      if (btn && frm) {
+        btn.addEventListener('click', function () {
+          frm.hidden = !frm.hidden;
+          if (!frm.hidden) {
+            var slug = frm.querySelector('input[name="new_slug"]');
+            if (slug) slug.focus();
+          }
+        });
+      }
     })();
   </script>
 
