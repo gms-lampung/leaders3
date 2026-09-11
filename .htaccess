@@ -1,0 +1,14 @@
+# Aplikasi gabungan GMS Lampung — front controller.
+# Di Vercel routing ditangani vercel.json; file ini untuk Apache/Laragon.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+# Lindungi file sensitif agar tidak diunduh langsung
+<FilesMatch "^(\.env|composer\.(json|lock))$">
+  Require all denied
+</FilesMatch>

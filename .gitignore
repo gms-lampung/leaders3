@@ -1,0 +1,18 @@
+# Local storage (fallback JSON files)
+data/*.json
+!important.json
+
+# Environment file (copy dari .env.example)
+.env
+.data.env
+
+# Logs
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.vercel
+.env*

@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.php",
+      "use": "vercel-php@0.9.0",
+      "config": {
+        "maxDuration": 10,
+        "includeFiles": [
+          "pages/**",
+          "lib/**",
+          "seed/**",
+          "data/**"
+        ]
+      }
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/sw.js", "dest": "/public/sw.js" },
+    { "src": "/manifest.json", "dest": "/public/manifest.json" },
+    { "src": "/css/(.*)", "dest": "/public/css/$1" },
+    { "src": "/icons/(.*)", "dest": "/public/icons/$1" },
+    { "src": "/(.*)", "dest": "/api/index.php" }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false
+}

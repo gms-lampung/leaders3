@@ -1,0 +1,167 @@
+/* ============================================================
+ * gms.css — Design System GMS (dipakai semua halaman web)
+ * Palet warna JANGAN diganti (lihat AGENTS.md)
+ * ============================================================ */
+
+:root {
+  --gms-blue: #0052cc;
+  --gms-blue-dark: #003399;
+  --gms-gradient: linear-gradient(90deg, #0038a8 0%, #0052cc 60%, #0066ff 100%);
+  --bg-page: #f4f6fa;
+  --text-main: #18233b;
+  --text-sub: #5e6d82;
+  --border-input: #d0d7de;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 2rem;
+  margin: 0;
+}
+
+.gms-gradient { background-image: var(--gms-gradient); }
+
+.btn-gms-pill {
+  background-image: linear-gradient(180deg, #005ce6 0%, #0044b3 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.5rem 1.5rem;
+  border-radius: 50px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 82, 204, 0.3);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-gms-pill:hover, .btn-gms-pill:active {
+  background-image: none;
+  background-color: #003bbb;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.input-gms {
+  width: 100%;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  background-color: #ffffff;
+}
+.input-gms:focus {
+  border-color: var(--gms-blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+}
+
+.label-gms {
+  display: block;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-bottom: 0.25rem;
+}
+
+.card-gms {
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  margin-bottom: 1.25rem;
+}
+
+.section-title-wrap { padding-top: 1rem; padding-bottom: 0.75rem; }
+.page-title { font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; margin: 0; }
+.blue-indicator { width: 45px; height: 4px; background-color: var(--gms-blue); border-radius: 4px; margin-top: 5px; }
+
+.badge-ibadah {
+  background-color: #e0edff;
+  color: #0044b3;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 0.25em 0.6em;
+  border-radius: 6px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.table { width: 100%; margin: 0; border-collapse: collapse; }
+.table thead th {
+  background-color: #f8fafc !important;
+  color: #64748b !important;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.table tbody td {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+.table tbody tr:hover { background-color: #f8fafc; }
+
+.group-header {
+  background-image: var(--gms-gradient);
+  color: white;
+  padding: 0.65rem 1rem;
+  border-radius: 12px 12px 0 0;
+  font-weight: 700;
+  font-size: 0.88rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-pill {
+  border: 1px solid #d0d7de;
+  border-radius: 10px;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+}
+.tab-pill:hover { border-color: var(--gms-blue); color: var(--gms-blue); }
+.tab-pill.active { background-image: var(--gms-gradient); color: #ffffff; border-color: transparent; box-shadow: 0 3px 8px rgba(0, 82, 204, 0.3); }
+
+.dot-live { width: 9px; height: 9px; border-radius: 50%; display: inline-block; animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ============================================================
+ * Tabel mobile: berubah jadi blok dengan label.
+ * Label per kolom didefinisikan per-halaman lewat
+ * `.table-X tbody td:nth-of-type(n)::before { content: "..." }`
+ * ============================================================ */
+@media screen and (max-width: 768px) {
+  .table, .table thead, .table tbody, .table th, .table td, .table tr { display: block; }
+  .table thead { display: none; }
+  .table tbody tr { border-bottom: 1px dashed #e2e8f0; padding: 0.75rem; }
+  .table tbody td { border: none; padding: 0.3rem 0 0.3rem 38%; position: relative; }
+  .table tbody td::before {
+    position: absolute; left: 0; width: 34%;
+    font-weight: 700; color: #64748b; font-size: 0.68rem; text-transform: uppercase;
+  }
+  .no-data { padding-left: 0 !important; text-align: center; }
+  .no-data::before { display: none !important; }
+}
