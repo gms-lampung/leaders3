@@ -518,3 +518,284 @@ function kb_render_section(string $key, array $sec): void {
   }
   if (kb_has_links($key)) kb_render_links($sec);
 }
+
+/* ============================================================
+ * Editor satu field besar (admin).
+ *
+ * Semua konten sebuah section ditampilkan sebagai SATU textarea
+ * dengan penanda baris `# nama`. Saat disimpan, penanda dipecah
+ * kembali ke struktur lama sehingga halaman publik & data Redis
+ * (dipakai juga leaders2) tidak berubah. Penanda yang TIDAK ada
+ * di teks tidak mengubah konten lama (keep-old).
+ *
+ * Format:
+ *   # intro                 -> text
+ *   # link                  -> baris 1 = URL, baris 2 = Label
+ *   # definisi              -> lines (satu item per baris)
+ *   # sub: <slug>           -> blok subseksi
+ *     ## <nama field>       -> isi satu field blok tersebut
+ *   # links / # faq         -> pasangan Kolom<TAB>Isi per baris
+ * ============================================================ */
+
+/** Pecah teks besar menjadi [['m' => penanda, 'b' => baris], ...]. */
+function kb_big_chunks(string $text): array {
+  $text = str_replace(["\r\n", "\r"], "\n", $text);
+  $chunks = [];
+  $marker = null;
+  $body = [];
+  foreach (preg_split('/\n/', $text) as $ln) {
+    if (preg_match('/^# (.+)$/', $ln, $m)) {
+      if ($marker !== null) $chunks[] = ['m' => $marker, 'b' => $body];
+      $marker = trim($m[1]);
+      $body = [];
+    } elseif ($marker !== null) {
+      $body[] = $ln;
+    }
+  }
+  if ($marker !== null) $chunks[] = ['m' => $marker, 'b' => $body];
+  return $chunks;
+}
+
+/** Buang baris kosong di tepi (pertahankan baris kosong di tengah). */
+function kb_big_clean_lines(array $body): array {
+  $body = array_values($body);
+  while ($body && trim($body[0]) === '') array_shift($body);
+  while ($body && trim($body[count($body) - 1]) === '') array_pop($body);
+  return $body;
+}
+
+function kb_big_clean_text(array $body): string {
+  return implode("\n", kb_big_clean_lines($body));
+}
+
+/** Baris non-kosong sebagai daftar item (untuk tipe lines / int text). */
+function kb_big_line_items(array $body): array {
+  $out = [];
+  foreach (kb_big_clean_lines($body) as $ln) {
+    $t = trim($ln);
+    if ($t !== '') $out[] = $t;
+  }
+  return $out;
+}
+
+/** Pasangan Kolom<TAB>Isi (untuk FAQ, link, dan pairs di subseksi). */
+function kb_big_pair_items(array $body, string $k1, string $k2): array {
+  $out = [];
+  foreach (kb_big_clean_lines($body) as $ln) {
+    $p = explode("\t", $ln, 2);
+    if (count($p) === 2) {
+      $a = trim($p[0]);
+      $b = trim($p[1]);
+      if ($a !== '') $out[] = [$k1 => $a, $k2 => $b];
+    }
+  }
+  return $out;
+}
+
+/** Seriakan seluruh konten sebuah section menjadi satu teks besar. */
+function kb_big_text(string $key, array $sec): string {
+  $content = kb_lget($sec, 'content', []);
+  $groups = [];
+
+  // Markers: pasangan [teks blok, isi] lalu dirapikan di akhir.
+
+  $intro = (string)kb_lget($content, 'intro', '');
+  $groups[] = ['# intro', $intro];
+
+  $url = (string)kb_lget($content, 'link_url', '');
+  $lbl = (string)kb_lget($content, 'link_label', '');
+  if ($url !== '' || $lbl !== '') {
+    $groups[] = ['# link', rtrim($url . "\n" . $lbl)];
+  }
+
+  foreach (kb_content_fields($key) as $f) {
+    if (in_array($f, ['intro', 'link_url', 'link_label'], true)) continue;
+    $meta = kb_content_meta($f);
+    $val = kb_lget($content, $f);
+    if ($meta['type'] === 'lines') {
+      $v = kb_lines_value($val);
+      $groups[] = ['# ' . $f, $v ? implode("\n", $v) : ''];
+    } else {
+      $groups[] = ['# ' . $f, trim((string)$val)];
+    }
+  }
+
+  $subDef = kb_subsection_def($key);
+  if ($subDef) {
+    $container = $subDef['scope'] === 'content'
+      ? kb_lget($content, 'subsections', [])
+      : kb_lget($sec, 'subsections', []);
+    foreach ($subDef['blocks'] as $slug => $block) {
+      $sub = kb_lget($container, $slug, []);
+      $parts = ['# sub: ' . $slug];
+      foreach ($block['fields'] as $f) {
+        $fname = $f[0];
+        $ftype = $f[1];
+        $v = kb_lget($sub, $fname);
+        $body = '';
+        if ($ftype === 'lines') {
+          $arr = kb_lines_value($v);
+          $body = $arr ? implode("\n", $arr) : '';
+        } elseif ($ftype === 'pairs') {
+          $k1 = isset($f[3]) && $f[3] !== '' ? $f[3] : 'title';
+          $k2 = isset($f[4]) && $f[4] !== '' ? $f[4] : 'text';
+          $items = is_array($v) ? $v : [];
+          $pl = [];
+          foreach ($items as $it) {
+            if (is_array($it)) $pl[] = (string)kb_lget($it, $k1) . "\t" . (string)kb_lget($it, $k2);
+          }
+          $body = $pl ? implode("\n", $pl) : '';
+        } elseif ($ftype === 'int') {
+          $raw = (string)$v;
+          $body = $raw !== '' ? (string)(int)$raw : '';
+        } else {
+          $body = trim((string)$v);
+        }
+        if ($body !== '') $parts[] = '## ' . $fname . "\n" . $body;
+      }
+      $groups[] = [implode("\n", $parts), ''];
+    }
+  }
+
+  foreach (kb_section_fields($key) as $sf) {
+    $v = kb_lines_value(kb_lget($sec, $sf['field'], []));
+    $groups[] = ['# ' . $sf['field'], $v ? implode("\n", $v) : ''];
+  }
+
+  if (kb_has_links($key)) {
+    $items = kb_lget($sec, 'links', []);
+    $pl = [];
+    if (is_array($items)) {
+      foreach ($items as $it) {
+        if (is_array($it)) $pl[] = (string)kb_lget($it, 'label') . "\t" . (string)kb_lget($it, 'url');
+      }
+    }
+    $groups[] = ['# links', $pl ? implode("\n", $pl) : ''];
+  }
+
+  $faq = kb_lget($sec, 'faq', []);
+  $fl = [];
+  if (is_array($faq)) {
+    foreach ($faq as $it) {
+      if (is_array($it)) $fl[] = (string)kb_lget($it, 'q') . "\t" . (string)kb_lget($it, 'a');
+    }
+  }
+  $groups[] = ['# faq', $fl ? implode("\n", $fl) : ''];
+
+  $out = [];
+  foreach ($groups as $g) {
+    $blockTxt = $g[0];
+    if ($g[1] !== '') $blockTxt .= "\n" . $g[1];
+    $out[] = $blockTxt;
+  }
+  return implode("\n\n", $out);
+}
+
+/** Terapkan teks besar kembali ke struktur section (keep-old per penanda). */
+function kb_big_text_apply(string $key, array &$sec, string $text): void {
+  if (!isset($sec['content']) || !is_array($sec['content'])) $sec['content'] = [];
+
+  $subDef = kb_subsection_def($key);
+  foreach (kb_big_chunks($text) as $c) {
+    $marker = $c['m'];
+    $body = $c['b'];
+
+    if ($marker === 'link') {
+      $lines = kb_big_clean_lines($body);
+      $sec['content']['link_url'] = isset($lines[0]) ? trim($lines[0]) : '';
+      $sec['content']['link_label'] = isset($lines[1]) ? trim($lines[1]) : '';
+      continue;
+    }
+
+    if (preg_match('/^sub: (.+)$/', $marker, $mm)) {
+      $slug = trim($mm[1]);
+      if (!$subDef || !isset($subDef['blocks'][$slug])) continue;
+      $scope = $subDef['scope'];
+      if ($scope === 'content') {
+        if (!isset($sec['content']['subsections']) || !is_array($sec['content']['subsections'])) {
+          $sec['content']['subsections'] = [];
+        }
+        if (!isset($sec['content']['subsections'][$slug]) || !is_array($sec['content']['subsections'][$slug])) {
+          $sec['content']['subsections'][$slug] = [];
+        }
+        $item = $sec['content']['subsections'][$slug];
+      } else {
+        if (!isset($sec['subsections']) || !is_array($sec['subsections'])) $sec['subsections'] = [];
+        if (!isset($sec['subsections'][$slug]) || !is_array($sec['subsections'][$slug])) $sec['subsections'][$slug] = [];
+        $item = $sec['subsections'][$slug];
+      }
+
+      // Pecah isi blok menjadi chunk per "## nama field"
+      $fkey = null;
+      $fbody = [];
+      $fchunks = [];
+      foreach ($body as $ln) {
+        if (preg_match('/^## (.+)$/', $ln, $fm)) {
+          if ($fkey !== null) $fchunks[] = [$fkey, $fbody];
+          $fkey = trim($fm[1]);
+          $fbody = [];
+        } else {
+          $fbody[] = $ln;
+        }
+      }
+      if ($fkey !== null) $fchunks[] = [$fkey, $fbody];
+
+      $byName = [];
+      foreach ($subDef['blocks'][$slug]['fields'] as $f) $byName[$f[0]] = $f;
+      foreach ($fchunks as $fc) {
+        $fname = $fc[0];
+        if (!isset($byName[$fname])) continue;
+        $f = $byName[$fname];
+        if ($f[1] === 'lines') {
+          $item[$fname] = kb_big_line_items($fc[1]);
+        } elseif ($f[1] === 'pairs') {
+          $k1 = isset($f[3]) && $f[3] !== '' ? $f[3] : 'title';
+          $k2 = isset($f[4]) && $f[4] !== '' ? $f[4] : 'text';
+          $item[$fname] = kb_big_pair_items($fc[1], $k1, $k2);
+        } elseif ($f[1] === 'int') {
+          $item[$fname] = (int)kb_big_clean_text($fc[1]);
+        } else {
+          $item[$fname] = kb_big_clean_text($fc[1]);
+        }
+      }
+
+      if ($scope === 'content') {
+        $sec['content']['subsections'][$slug] = $item;
+      } else {
+        $sec['subsections'][$slug] = $item;
+      }
+      continue;
+    }
+
+    if ($marker === 'links') {
+      if (kb_has_links($key)) $sec['links'] = kb_big_pair_items($body, 'label', 'url');
+      continue;
+    }
+
+    if ($marker === 'faq') {
+      $sec['faq'] = kb_big_pair_items($body, 'q', 'a');
+      continue;
+    }
+
+    // Field konten generik
+    $contentFields = kb_content_fields($key);
+    if (in_array($marker, $contentFields, true)) {
+      $meta = kb_content_meta($marker);
+      if ($meta['type'] === 'lines') {
+        $sec['content'][$marker] = kb_big_line_items($body);
+      } else {
+        $sec['content'][$marker] = kb_big_clean_text($body);
+      }
+      continue;
+    }
+
+    // Field level-section (msj: cek_kelulusan)
+    foreach (kb_section_fields($key) as $sf) {
+      if ($sf['field'] === $marker) {
+        $sec[$marker] = $sf['type'] === 'lines'
+          ? kb_big_line_items($body)
+          : kb_big_clean_text($body);
+      }
+    }
+  }
+}

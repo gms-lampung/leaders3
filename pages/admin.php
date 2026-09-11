@@ -56,6 +56,13 @@ function admin_save_section(array &$content, string $key): void {
     $c['visible'] = array_key_exists($pfx . 'visible', $_POST) ? true : false;
   }
 
+  // Editor satu field besar: teks dipecah otomatis ke struktur lama.
+  $bigIn = $pfx . 'big_text';
+  if (array_key_exists($bigIn, $_POST)) {
+    kb_big_text_apply($key, $c, (string)$_POST[$bigIn]);
+    return;
+  }
+
   // Field konten generik (keep-old: hanya menulis bila input tidak kosong)
   $ct = &$c['content'];
   foreach (kb_content_fields($key) as $field) {
@@ -396,6 +403,12 @@ $site = lget($content, 'site', []);
     .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #fff; border-radius: 9999px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.2s; }
     input:checked + .switch { background: var(--gms-blue); }
     input:checked + .switch::after { transform: translateX(20px); }
+    .big-konten {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+      font-size: 0.8125rem;
+      line-height: 1.65;
+      min-height: 420px;
+    }
 
     /* ===== Form ringkas: baris/blok dapat dilipat ===== */
     details.adm-row > summary, details.adm-block > summary {
@@ -576,12 +589,7 @@ $site = lget($content, 'site', []);
         <!-- TAMPILAN FORM -->
         <div class="card-gms !pb-3 mb-3">
           <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Form Isi: <?php echo htmlspecialchars(lget($sec, 'name', $activeKey)); ?></p>
-          <div class="flex flex-wrap gap-2" id="admView">
-            <button type="button" class="btn-switch btn-switch-active" data-adm-mode="filled"><i class="fa-solid fa-filter"></i> Hanya Terisi</button>
-            <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="all"><i class="fa-solid fa-circle-plus"></i> Buka Semua</button>
-            <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="none"><i class="fa-solid fa-circle-minus"></i> Tutup Semua</button>
-          </div>
-          <p class="hint-gms mb-0">Field yang belum diisi disembunyikan agar form ringkas. Pilih "Buka Semua" bila ingin mengisi field baru (mengosongkan kolom tidak menghapus nilai lama).</p>
+          <p class="hint-gms mb-0">Semua konten kategori ini jadi <strong>satu field besar</strong>: tulis dengan penanda <code># nama</code>, simpan, lalu sistem memecahnya otomatis ke bagian-bagian yang tampil di halaman publik. Identitas section (nama, ikon, tampil) tetap di kolom paling atas.</p>
         </div>
 
         <form method="POST" action="<?php echo app_url('admin?s=' . urlencode($activeKey)); ?>" enctype="multipart/form-data">
@@ -591,24 +599,25 @@ $site = lget($content, 'site', []);
           <input type="hidden" name="action" value="save">
           <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
           <?php
-          $subRows = [];
-          $subDef = kb_subsection_def($activeKey);
-          if ($subDef) {
-            foreach ($subDef['blocks'] as $subSlug => $subBlock) {
-              $subCur = kb_get_sub($activeKey, $sec, $subSlug);
-              foreach ($subBlock['fields'] as $sf) {
-                $subRows[] = [
-                  'slug' => $subSlug,
-                  'block' => (string)lget($subBlock, 'label', (string)$subSlug),
-                  'icon' => (string)lget($subBlock, 'icon', 'fa-solid fa-file'),
-                  'cur' => $subCur,
-                  'field' => $sf,
-                ];
-              }
-            }
-          }
           $spfx = 'sec_' . $activeKey . '_';
           $sName = lget($sec, 'name', $activeKey);
+          $markerHint = [];
+          foreach (kb_content_fields($activeKey) as $fHint) {
+            if (in_array($fHint, ['link_url', 'link_label'], true)) continue;
+            $markerHint[] = '# ' . $fHint;
+          }
+          $markerHint[] = '# link';
+          $subDefHint = kb_subsection_def($activeKey);
+          if ($subDefHint) {
+            foreach ($subDefHint['blocks'] as $subSlug2 => $subBlock2) {
+              $markerHint[] = '# sub: ' . $subSlug2;
+            }
+          }
+          foreach (kb_section_fields($activeKey) as $sfHint) {
+            $markerHint[] = '# ' . $sfHint['field'];
+          }
+          if (kb_has_links($activeKey)) $markerHint[] = '# links';
+          $markerHint[] = '# faq';
           ?>
 
           <!-- IDENTITAS -->
@@ -643,129 +652,21 @@ $site = lget($content, 'site', []);
             </div>
           </details>
 
-          <!-- KONTEN SECTION -->
-          <?php foreach (kb_content_fields($activeKey) as $cvField):
-            $cvMeta = kb_content_meta($cvField);
-            $cvVal = kb_field_value($sec, $cvField);
-            $cvLines = kb_lines_value($cvVal);
-            $cvHas = $cvLines ? 1 : 0;
-            $cvPre = is_array($cvVal) ? implode("\n", array_map(function ($x) {
-              return is_array($x) ? (string)lget($x, 'title', (string)lget($x, 'text', '')) : (string)$x;
-            }, $cvVal)) : (string)$cvVal;
-          ?>
-          <details class="adm-row" data-has="<?php echo $cvHas; ?>" <?php echo $cvHas ? 'open' : ''; ?>>
+          <!-- KONTEN UTUH — SATU TEXTAREA BESAR -->
+          <details class="adm-row" data-has="1" open>
             <summary>
-              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($cvMeta['icon']); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($cvMeta['label']); ?></span>
-              <span class="adm-sum-hint"><?php echo $cvHas ? count($cvLines) . ' baris' : 'kosong'; ?></span>
+              <span class="adm-sum-icon"><i class="fa-solid fa-text-height"></i></span>
+              <span class="adm-sum-label">Konten (satu field besar)</span>
+              <span class="adm-sum-hint"><?php echo $sName; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
             <div class="adm-row-body">
-              <?php if ($cvMeta['input'] === 'textarea'): ?>
-              <textarea name="<?php echo htmlspecialchars($spfx . 'c_' . $cvField); ?>" class="input-gms" rows="<?php echo (int)$cvMeta['rows']; ?>"><?php echo htmlspecialchars($cvPre); ?></textarea>
-              <?php else: ?>
-              <input type="<?php echo $cvMeta['input'] === 'url' ? 'url' : 'text'; ?>" name="<?php echo htmlspecialchars($spfx . 'c_' . $cvField); ?>" class="input-gms" value="<?php echo htmlspecialchars($cvPre); ?>">
-              <?php endif; ?>
-            </div>
-          </details>
-          <?php endforeach; ?>
-
-          <!-- SUBSEKSI (tiap field = satu baris) -->
-          <?php foreach ($subRows as $sr):
-            $sf = $sr['field'];
-            $sfName = $sf[0];
-            $sfType = $sf[1];
-            $sfLabel = (isset($sf[2]) && $sf[2] !== '') ? $sf[2] : $sfName;
-            $sfInput = $spfx . 's_' . $sr['slug'] . '_' . $sfName;
-            $sv = lget($sr['cur'], $sfName);
-            $sfLines = kb_lines_value($sv);
-            $sfHas = $sfLines ? 1 : 0;
-            $svPre = '';
-            if ($sfType === 'lines') {
-              $svPre = is_array($sv) ? implode("\n", $sv) : (string)$sv;
-            } elseif ($sfType === 'pairs' && is_array($sv)) {
-              $svPre = kb_encode_pairs($sv, isset($sf[3]) && $sf[3] !== '' ? $sf[3] : 'title', isset($sf[4]) && $sf[4] !== '' ? $sf[4] : 'text');
-            } else {
-              $svPre = (string)$sv;
-            }
-          ?>
-          <details class="adm-row" data-has="<?php echo $sfHas; ?>" <?php echo $sfHas ? 'open' : ''; ?>>
-            <summary>
-              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($sr['icon']); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sr['block'] . ' · ' . $sfLabel); ?></span>
-              <span class="adm-sum-hint"><?php echo $sfHas ? ($sfType === 'lines' ? count($sfLines) . ' baris' : 'terisi') : 'kosong'; ?></span>
-              <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-            </summary>
-            <div class="adm-row-body">
-              <?php if ($sfType === 'lines'): ?>
-              <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="lines" data-ph="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
-              <?php elseif ($sfType === 'pairs'): ?>
-              <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="pairs" data-ph1="Judul" data-ph2="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
-              <?php elseif ($sfType === 'int'): ?>
-              <input type="number" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
-              <?php else: ?>
-              <input type="text" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
-              <?php endif; ?>
-            </div>
-          </details>
-          <?php endforeach; ?>
-
-          <!-- FIELD LEVEL SECTION (msj: cek kelulusan) -->
-          <?php foreach (kb_section_fields($activeKey) as $sf):
-            $sfv = lget($sec, $sf['field'], []);
-            $sfLines2 = kb_lines_value($sfv);
-            $sfHas2 = $sfLines2 ? 1 : 0;
-          ?>
-          <details class="adm-row" data-has="<?php echo $sfHas2; ?>" <?php echo $sfHas2 ? 'open' : ''; ?>>
-            <summary>
-              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($sf, 'icon', 'fa-solid fa-graduation-cap')); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars(lget($sf, 'label', 'Informasi Kelulusan')); ?></span>
-              <span class="adm-sum-hint"><?php echo $sfHas2 ? count($sfLines2) . ' baris' : 'kosong'; ?></span>
-              <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-            </summary>
-            <div class="adm-row-body">
-              <textarea name="<?php echo htmlspecialchars($spfx . 'l_' . $sf['field']); ?>" class="input-gms" rows="6" data-row-editor="lines" data-ph="Langkah"><?php echo htmlspecialchars(implode("\n", $sfv)); ?></textarea>
-            </div>
-          </details>
-          <?php endforeach; ?>
-
-          <!-- LINK TUTORIAL -->
-          <?php if (kb_has_links($activeKey)):
-            $linkHas = count(lget($sec, 'links', [])) ? 1 : 0;
-          ?>
-          <details class="adm-row" data-has="<?php echo $linkHas; ?>" <?php echo $linkHas ? 'open' : ''; ?>>
-            <summary>
-              <span class="adm-sum-icon"><i class="fa-solid fa-link"></i></span>
-              <span class="adm-sum-label">Link Tutorial</span>
-              <span class="adm-sum-hint"><?php echo $linkHas ? 'terisi' : 'kosong'; ?></span>
-              <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-            </summary>
-            <div class="adm-row-body">
-              <label class="label-gms">Tiap baris = satu link</label>
-              <textarea name="<?php echo htmlspecialchars($spfx . 'links'); ?>" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
-            </div>
-          </details>
-          <?php endif; ?>
-
-          <!-- FAQ -->
-          <?php $faqHas = count(lget($sec, 'faq', [])) ? 1 : 0; ?>
-          <details class="adm-row" data-has="<?php echo $faqHas; ?>" <?php echo $faqHas ? 'open' : ''; ?>>
-            <summary>
-              <span class="adm-sum-icon"><i class="fa-solid fa-circle-question"></i></span>
-              <span class="adm-sum-label">FAQ</span>
-              <span class="adm-sum-hint"><?php echo $faqHas ? count(lget($sec, 'faq', [])) . ' item' : 'kosong'; ?></span>
-              <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-            </summary>
-            <div class="adm-row-body">
-              <label class="label-gms">Tiap baris = satu pasangan Tanya-Jawab</label>
-              <textarea name="<?php echo htmlspecialchars($spfx . 'faq'); ?>" class="input-gms" rows="8" data-row-editor="pairs" data-ph1="Pertanyaan" data-ph2="Jawaban"><?php
-                $faqArr = lget($sec, 'faq', []);
-                $faqLines = [];
-                foreach ($faqArr as $fq) {
-                  $faqLines[] = lget($fq, 'q', '') . "\t" . lget($fq, 'a', '');
-                }
-                echo htmlspecialchars(implode("\n", $faqLines));
-              ?></textarea>
+              <textarea name="<?php echo htmlspecialchars($spfx . 'big_text'); ?>" class="input-gms big-konten" rows="30" spellcheck="false"><?php echo htmlspecialchars(kb_big_text($activeKey, $sec)); ?></textarea>
+              <p class="hint-gms mt-1"><strong>Cara pakai:</strong> tulis penanda <code># nama</code> di satu baris, lalu isinya di baris-baris berikutnya. Baris biasa = satu item (mis. satu syarat per baris). FAQ &amp; Link: <code>Kolom &lt;TAB&gt; Isi</code>. Subseksi: <code># sub: slug</code> lalu tiap field dengan <code>## nama</code>. Penanda yang tidak ditulis tidak diubah.</p>
+              <details class="mt-2">
+                <summary class="text-xs font-bold text-[#5e6d82] cursor-pointer"><i class="fa-solid fa-list-ul mr-1"></i> Penanda yang tersedia di kategori ini</summary>
+                <p class="hint-gms mb-0 mt-1"><?php echo htmlspecialchars(implode(' ', $markerHint)); ?></p>
+              </details>
             </div>
           </details>
 
@@ -787,30 +688,6 @@ $site = lget($content, 'site', []);
   <?php gms_bottom_nav('admin'); ?>
 
   <script>
-    (function () {
-      var rows = Array.prototype.slice.call(document.querySelectorAll('details.adm-row, details.adm-block'));
-      function applyMode(m) {
-        rows.forEach(function (d) {
-          if (m === 'all') { d.open = true; d.hidden = false; }
-          else if (m === 'none') { d.open = false; d.hidden = false; }
-          else { d.open = d.getAttribute('data-has') === '1'; d.hidden = d.getAttribute('data-has') !== '1'; }
-        });
-        document.querySelectorAll('#admView .btn-switch').forEach(function (b) {
-          var act = b.getAttribute('data-adm-mode') === m;
-          b.classList.toggle('btn-switch-active', act);
-          b.classList.toggle('btn-switch-inactive', !act);
-        });
-      }
-      var bar = document.getElementById('admView');
-      if (bar) {
-        bar.addEventListener('click', function (e) {
-          var b = e.target.closest('[data-adm-mode]');
-          if (b) applyMode(b.getAttribute('data-adm-mode'));
-        });
-      }
-      applyMode('filled');
-    })();
-
     (function () {
       function editor(ta) {
         if (ta._rowEditorReady) return;
