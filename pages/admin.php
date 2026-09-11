@@ -582,184 +582,181 @@ $site = lget($content, 'site', []);
             <input type="hidden" name="visible_<?php echo htmlspecialchars($sk); ?>" value="<?php echo lget($sv, 'visible', true) ? '1' : '0'; ?>">
           <?php endforeach; ?>
 
-          <!-- IDENTITAS SECTION -->
+      <!-- SEMUA FIELD — SATU DAFTAR LANJUTAN -->
+      <?php
+      $subRows = [];
+      $subDef = kb_subsection_def($activeKey);
+      if ($subDef) {
+        foreach ($subDef['blocks'] as $subSlug => $subBlock) {
+          $subCur = kb_get_sub($activeKey, $sec, $subSlug);
+          foreach ($subBlock['fields'] as $sf) {
+            $subRows[] = [
+              'slug' => $subSlug,
+              'block' => (string)lget($subBlock, 'label', (string)$subSlug),
+              'icon' => (string)lget($subBlock, 'icon', 'fa-solid fa-file'),
+              'cur' => $subCur,
+              'field' => $sf,
+            ];
+          }
+        }
+      }
+      ?>
 
-      <!-- IDENTITAS SECTION -->
-      <details class="card-gms adm-block" data-has="1" open>
+      <!-- IDENTITAS -->
+      <details class="adm-row" data-has="1" open>
         <summary>
           <span class="adm-sum-icon"><i class="fa-solid fa-tag"></i></span>
-          <span class="adm-title">Identitas Section</span>
+          <span class="adm-sum-label">Identitas Section</span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="label-gms">Nama Section</label>
-            <input type="text" name="name" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'name')); ?>">
-          </div>
-          <div>
-            <label class="label-gms">Icon (Font Awesome class)</label>
-            <input type="text" name="icon" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'icon')); ?>" placeholder="fa-solid fa-book">
-          </div>
-          <div class="flex items-end">
-            <label class="flex items-center justify-between gap-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3 cursor-pointer select-none w-full">
-              <span class="flex items-center gap-2 text-sm font-bold text-[#18233b]">
-                <i class="fa-solid fa-eye text-[#0052cc]"></i> Visible
-              </span>
-              <input type="checkbox" name="visible" value="1" class="sr-only"
-                     <?php echo lget($sec, 'visible', true) ? 'checked' : ''; ?>>
-              <span class="switch"></span>
-            </label>
-          </div>
-        </div>
-      </details>
-
-      <!-- KONTEN SECTION (skema tunggal) -->
-      <div class="card-gms">
-        <div class="flex items-center gap-2 border-b border-[#e2e8f0] pb-3 mb-3">
-          <i class="fa-solid fa-file-lines text-[#0052cc]"></i>
-          <span class="font-extrabold uppercase tracking-wide text-sm">Konten Section</span>
-        </div>
-        <?php foreach (kb_content_fields($activeKey) as $cvField):
-          $cvMeta = kb_content_meta($cvField);
-          $cvVal = kb_field_value($sec, $cvField);
-          $cvLines = kb_lines_value($cvVal);
-          $cvHas = $cvLines ? 1 : 0;
-          $cvPre = is_array($cvVal) ? implode("\n", array_map(function ($x) {
-            return is_array($x) ? (string)lget($x, 'title', (string)lget($x, 'text', '')) : (string)$x;
-          }, $cvVal)) : (string)$cvVal;
-        ?>
-        <details class="adm-row" data-has="<?php echo $cvHas; ?>" <?php echo $cvHas ? 'open' : ''; ?>>
-          <summary>
-            <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($cvMeta['icon']); ?>"></i></span>
-            <span class="adm-sum-label"><?php echo htmlspecialchars($cvMeta['label']); ?></span>
-            <span class="adm-sum-hint"><?php echo $cvHas ? count($cvLines) . ' baris' : 'kosong'; ?></span>
-            <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-          </summary>
-          <div class="adm-row-body">
-            <?php if ($cvMeta['input'] === 'textarea'): ?>
-            <textarea name="<?php echo htmlspecialchars($cvField); ?>" class="input-gms" rows="<?php echo (int)$cvMeta['rows']; ?>"><?php echo htmlspecialchars($cvPre); ?></textarea>
-            <?php else: ?>
-            <input type="<?php echo $cvMeta['input'] === 'url' ? 'url' : 'text'; ?>" name="<?php echo htmlspecialchars($cvField); ?>" class="input-gms" value="<?php echo htmlspecialchars($cvPre); ?>">
-            <?php endif; ?>
-          </div>
-        </details>
-        <?php endforeach; ?>
-      </div>
-
-      <!-- SUBSEKSI (skema tunggal) -->
-      <?php $subDef = kb_subsection_def($activeKey); if ($subDef): ?>
-      <details class="card-gms adm-block" data-has="1" open>
-        <summary>
-          <span class="adm-sum-icon"><i class="fa-solid fa-layer-group"></i></span>
-          <span class="adm-title">Subseksi</span>
-          <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-        </summary>
-        <?php foreach ($subDef['blocks'] as $subSlug => $subBlock): ?>
-          <?php
-          $subCur = kb_get_sub($activeKey, $sec, $subSlug);
-          $subHas = 0;
-          foreach ($subBlock['fields'] as $sbF) {
-            if (count(kb_lines_value(lget($subCur, $sbF[0])))) { $subHas = 1; break; }
-          }
-          ?>
-          <details class="adm-block adm-block-sub" data-has="<?php echo $subHas; ?>" <?php echo $subHas ? 'open' : ''; ?>>
-            <summary>
-              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($subBlock, 'icon', 'fa-solid fa-file')); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($subBlock['label']); ?></span>
-              <span class="adm-sum-hint"><?php echo $subHas ? 'terisi' : 'kosong'; ?></span>
-              <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
-            </summary>
-            <div class="adm-row-body">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <?php foreach ($subBlock['fields'] as $sf): ?>
-                  <?php
-                    $sfName = $sf[0];
-                    $sfType = $sf[1];
-                    $sfLabel = isset($sf[2]) ? $sf[2] : $sfName;
-                    $sfInput = 'sub_' . $subSlug . '_' . $sfName;
-                    $sv = lget($subCur, $sfName);
-                    $svPre = '';
-                    if ($sfType === 'lines') {
-                      $svPre = is_array($sv) ? implode("\n", $sv) : (string)$sv;
-                    } elseif ($sfType === 'pairs' && is_array($sv)) {
-                      $svPre = kb_encode_pairs($sv, isset($sf[3]) && $sf[3] !== '' ? $sf[3] : 'title', isset($sf[4]) && $sf[4] !== '' ? $sf[4] : 'text');
-                    } else {
-                      $svPre = (string)$sv;
-                    }
-                  ?>
-                  <div class="<?php echo in_array($sfType, ['lines', 'pairs'], true) ? 'md:col-span-2' : ''; ?> mb-3">
-                    <label class="label-gms"><?php echo htmlspecialchars($sfLabel); ?></label>
-                    <?php if ($sfType === 'lines'): ?>
-                    <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="lines" data-ph="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
-                    <?php elseif ($sfType === 'pairs'): ?>
-                    <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="pairs" data-ph1="Judul" data-ph2="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
-                    <?php elseif ($sfType === 'int'): ?>
-                    <input type="number" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
-                    <?php else: ?>
-                    <input type="text" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
-                    <?php endif; ?>
-                  </div>
-                <?php endforeach; ?>
-              </div>
+        <div class="adm-row-body">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+              <label class="label-gms">Nama Section</label>
+              <input type="text" name="name" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'name')); ?>">
             </div>
-          </details>
-        <?php endforeach; ?>
+            <div>
+              <label class="label-gms">Icon (Font Awesome class)</label>
+              <input type="text" name="icon" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'icon')); ?>" placeholder="fa-solid fa-book">
+            </div>
+            <div class="flex items-end">
+              <label class="flex items-center justify-between gap-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3 cursor-pointer select-none w-full">
+                <span class="flex items-center gap-2 text-sm font-bold text-[#18233b]">
+                  <i class="fa-solid fa-eye text-[#0052cc]"></i> Tampil di halaman
+                </span>
+                <input type="checkbox" name="visible" value="1" class="sr-only"
+                       <?php echo lget($sec, 'visible', true) ? 'checked' : ''; ?>>
+                <span class="switch"></span>
+              </label>
+            </div>
+          </div>
+        </div>
       </details>
-      <?php endif; ?>
 
-      <!-- FIELD LEVEL SECTION (skema tunggal) -->
-      <?php $kbSecFields = kb_section_fields($activeKey); if ($kbSecFields): ?>
-      <?php $secHas = count(kb_lines_value(lget($sec, $kbSecFields[0]['field'], []))) ? 1 : 0; ?>
-      <details class="card-gms adm-block" data-has="<?php echo $secHas; ?>" <?php echo $secHas ? 'open' : ''; ?>>
+      <!-- KONTEN SECTION -->
+      <?php foreach (kb_content_fields($activeKey) as $cvField):
+        $cvMeta = kb_content_meta($cvField);
+        $cvVal = kb_field_value($sec, $cvField);
+        $cvLines = kb_lines_value($cvVal);
+        $cvHas = $cvLines ? 1 : 0;
+        $cvPre = is_array($cvVal) ? implode("\n", array_map(function ($x) {
+          return is_array($x) ? (string)lget($x, 'title', (string)lget($x, 'text', '')) : (string)$x;
+        }, $cvVal)) : (string)$cvVal;
+      ?>
+      <details class="adm-row" data-has="<?php echo $cvHas; ?>" <?php echo $cvHas ? 'open' : ''; ?>>
         <summary>
-          <span class="adm-sum-icon"><i class="fa-solid fa-graduation-cap"></i></span>
-          <span class="adm-title">Informasi Kelulusan</span>
-          <span class="adm-sum-hint"><?php echo $secHas ? 'terisi' : 'kosong'; ?></span>
+          <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($cvMeta['icon']); ?>"></i></span>
+          <span class="adm-sum-label"><?php echo htmlspecialchars($cvMeta['label']); ?></span>
+          <span class="adm-sum-hint"><?php echo $cvHas ? count($cvLines) . ' baris' : 'kosong'; ?></span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <?php foreach ($kbSecFields as $sf): ?>
-        <div class="mb-4">
-          <label class="label-gms"><?php echo htmlspecialchars(lget($sf, 'label')); ?></label>
-          <textarea name="sec_<?php echo htmlspecialchars(lget($sf, 'field')); ?>" class="input-gms" rows="6" data-row-editor="lines" data-ph="Langkah"><?php echo htmlspecialchars(implode("\n", lget($sec, lget($sf, 'field'), []))); ?></textarea>
+        <div class="adm-row-body">
+          <?php if ($cvMeta['input'] === 'textarea'): ?>
+          <textarea name="<?php echo htmlspecialchars($cvField); ?>" class="input-gms" rows="<?php echo (int)$cvMeta['rows']; ?>"><?php echo htmlspecialchars($cvPre); ?></textarea>
+          <?php else: ?>
+          <input type="<?php echo $cvMeta['input'] === 'url' ? 'url' : 'text'; ?>" name="<?php echo htmlspecialchars($cvField); ?>" class="input-gms" value="<?php echo htmlspecialchars($cvPre); ?>">
+          <?php endif; ?>
         </div>
-        <?php endforeach; ?>
       </details>
-      <?php endif; ?>
+      <?php endforeach; ?>
 
-      <!-- LINKS (skema tunggal) -->
-      <?php if (kb_has_links($activeKey)): ?>
-      <?php $linkHas = count(lget($sec, 'links', [])) ? 1 : 0; ?>
-      <details class="card-gms adm-block" data-has="<?php echo $linkHas; ?>" <?php echo $linkHas ? 'open' : ''; ?>>
+      <!-- SUBSEKSI (tiap field = satu baris) -->
+      <?php foreach ($subRows as $sr):
+        $sf = $sr['field'];
+        $sfName = $sf[0];
+        $sfType = $sf[1];
+        $sfLabel = (isset($sf[2]) && $sf[2] !== '') ? $sf[2] : $sfName;
+        $sfInput = 'sub_' . $sr['slug'] . '_' . $sfName;
+        $sv = lget($sr['cur'], $sfName);
+        $sfLines = kb_lines_value($sv);
+        $sfHas = $sfLines ? 1 : 0;
+        $svPre = '';
+        if ($sfType === 'lines') {
+          $svPre = is_array($sv) ? implode("\n", $sv) : (string)$sv;
+        } elseif ($sfType === 'pairs' && is_array($sv)) {
+          $svPre = kb_encode_pairs($sv, isset($sf[3]) && $sf[3] !== '' ? $sf[3] : 'title', isset($sf[4]) && $sf[4] !== '' ? $sf[4] : 'text');
+        } else {
+          $svPre = (string)$sv;
+        }
+      ?>
+      <details class="adm-row" data-has="<?php echo $sfHas; ?>" <?php echo $sfHas ? 'open' : ''; ?>>
+        <summary>
+          <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($sr['icon']); ?>"></i></span>
+          <span class="adm-sum-label"><?php echo htmlspecialchars($sr['block'] . ' · ' . $sfLabel); ?></span>
+          <span class="adm-sum-hint"><?php echo $sfHas ? ($sfType === 'lines' ? count($sfLines) . ' baris' : 'terisi') : 'kosong'; ?></span>
+          <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
+        </summary>
+        <div class="adm-row-body">
+          <?php if ($sfType === 'lines'): ?>
+          <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="lines" data-ph="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
+          <?php elseif ($sfType === 'pairs'): ?>
+          <textarea name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" rows="3" data-row-editor="pairs" data-ph1="Judul" data-ph2="Isi"><?php echo htmlspecialchars($svPre); ?></textarea>
+          <?php elseif ($sfType === 'int'): ?>
+          <input type="number" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
+          <?php else: ?>
+          <input type="text" name="<?php echo htmlspecialchars($sfInput); ?>" class="input-gms" value="<?php echo htmlspecialchars($svPre); ?>">
+          <?php endif; ?>
+        </div>
+      </details>
+      <?php endforeach; ?>
+
+      <!-- FIELD LEVEL SECTION (msj: cek kelulusan) -->
+      <?php foreach (kb_section_fields($activeKey) as $sf):
+        $sfv = lget($sec, $sf['field'], []);
+        $sfLines2 = kb_lines_value($sfv);
+        $sfHas2 = $sfLines2 ? 1 : 0;
+      ?>
+      <details class="adm-row" data-has="<?php echo $sfHas2; ?>" <?php echo $sfHas2 ? 'open' : ''; ?>>
+        <summary>
+          <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($sf, 'icon', 'fa-solid fa-graduation-cap')); ?>"></i></span>
+          <span class="adm-sum-label"><?php echo htmlspecialchars(lget($sf, 'label', 'Informasi Kelulusan')); ?></span>
+          <span class="adm-sum-hint"><?php echo $sfHas2 ? count($sfLines2) . ' baris' : 'kosong'; ?></span>
+          <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
+        </summary>
+        <div class="adm-row-body">
+          <textarea name="sec_<?php echo htmlspecialchars($sf['field']); ?>" class="input-gms" rows="6" data-row-editor="lines" data-ph="Langkah"><?php echo htmlspecialchars(implode("\n", $sfv)); ?></textarea>
+        </div>
+      </details>
+      <?php endforeach; ?>
+
+      <!-- LINK TUTORIAL -->
+      <?php if (kb_has_links($activeKey)):
+        $linkHas = count(lget($sec, 'links', [])) ? 1 : 0;
+      ?>
+      <details class="adm-row" data-has="<?php echo $linkHas; ?>" <?php echo $linkHas ? 'open' : ''; ?>>
         <summary>
           <span class="adm-sum-icon"><i class="fa-solid fa-link"></i></span>
-          <span class="adm-title">Link Tutorial</span>
+          <span class="adm-sum-label">Link Tutorial</span>
           <span class="adm-sum-hint"><?php echo $linkHas ? 'terisi' : 'kosong'; ?></span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <label class="label-gms">Link Tutorial (tiap baris = satu link)</label>
-        <textarea name="links_raw" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
+        <div class="adm-row-body">
+          <label class="label-gms">Tiap baris = satu link</label>
+          <textarea name="links_raw" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
+        </div>
       </details>
       <?php endif; ?>
 
       <!-- FAQ -->
       <?php $faqHas = count(lget($sec, 'faq', [])) ? 1 : 0; ?>
-      <details class="card-gms adm-block" data-has="<?php echo $faqHas; ?>" <?php echo $faqHas ? 'open' : ''; ?>>
+      <details class="adm-row" data-has="<?php echo $faqHas; ?>" <?php echo $faqHas ? 'open' : ''; ?>>
         <summary>
           <span class="adm-sum-icon"><i class="fa-solid fa-circle-question"></i></span>
-          <span class="adm-title">FAQ</span>
+          <span class="adm-sum-label">FAQ</span>
           <span class="adm-sum-hint"><?php echo $faqHas ? count(lget($sec, 'faq', [])) . ' item' : 'kosong'; ?></span>
           <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
         </summary>
-        <label class="label-gms">FAQ (tiap baris = satu Tanya-Jawab)</label>
-        <textarea name="faq_items" class="input-gms" rows="8" data-row-editor="pairs" data-ph1="Pertanyaan" data-ph2="Jawaban"><?php
-          $faqArr = lget($sec, 'faq', []);
-          $faqLines = [];
-          foreach ($faqArr as $fq) {
-            $faqLines[] = lget($fq, 'q', '') . "\t" . lget($fq, 'a', '');
-          }
-          echo htmlspecialchars(implode("\n", $faqLines));
-        ?></textarea>
-        <p class="hint-gms">Tiap baris = satu pasangan pertanyaan-jawaban. Klik "+ Tambah" untuk menambah baris baru.</p>
+        <div class="adm-row-body">
+          <label class="label-gms">Tiap baris = satu pasangan Tanya-Jawab</label>
+          <textarea name="faq_items" class="input-gms" rows="8" data-row-editor="pairs" data-ph1="Pertanyaan" data-ph2="Jawaban"><?php
+            $faqArr = lget($sec, 'faq', []);
+            $faqLines = [];
+            foreach ($faqArr as $fq) {
+              $faqLines[] = lget($fq, 'q', '') . "\t" . lget($fq, 'a', '');
+            }
+            echo htmlspecialchars(implode("\n", $faqLines));
+          ?></textarea>
+        </div>
       </details>
 
       <!-- SUBMIT -->
