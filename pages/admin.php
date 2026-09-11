@@ -133,13 +133,23 @@ function admin_save_section(array &$content, string $key): void {
   }
 }
 
-/** Sidebar navigasi admin: Pengaturan + tambah section. */
-function render_admin_sidebar(bool $siteActive): void {
+/** Sidebar navigasi admin: Pengaturan + daftar section. */
+function render_admin_sidebar(array $sections, string $activeKey): void {
+  $act = function (?string $k) use ($activeKey): string {
+    return $k === $activeKey ? ' adm-sb-item-active' : '';
+  };
   ?>
   <aside class="adm-sidebar">
-    <a class="adm-sb-item<?php echo $siteActive ? ' adm-sb-item-active' : ''; ?>" href="<?php echo app_url('admin?s=__site'); ?>">
+    <a class="adm-sb-item<?php echo $act('__site'); ?>" href="<?php echo app_url('admin?s=__site'); ?>">
       <i class="fa-solid fa-sliders adm-sb-ico"></i><span class="adm-sb-nm">Pengaturan Halaman</span>
     </a>
+    <div class="adm-sb-sep"></div>
+    <?php foreach ($sections as $key => $kc): ?>
+      <a class="adm-sb-item<?php echo $act($key); ?>" href="<?php echo app_url('admin?s=' . urlencode($key)); ?>">
+        <i class="<?php echo htmlspecialchars(lget($kc, 'icon', 'fa-solid fa-file')); ?> adm-sb-ico"></i>
+        <span class="adm-sb-nm"><?php echo htmlspecialchars(lget($kc, 'name', $key)); ?></span>
+      </a>
+    <?php endforeach; ?>
     <button type="button" class="adm-sb-add" id="sbAddBtn"><i class="fa-solid fa-plus"></i> Tambah Section</button>
     <div id="sbAddForm" class="adm-sb-addform" hidden>
       <form method="POST" action="<?php echo app_url('admin'); ?>">
@@ -541,7 +551,7 @@ $site = lget($content, 'site', []);
     <?php endif; ?>
 
     <div class="adm-shell">
-      <?php render_admin_sidebar($viewSites); ?>
+      <?php render_admin_sidebar($sections, $viewSites ? '__site' : $activeKey); ?>
 
       <div class="adm-main">
         <?php if ($viewSites): ?>
@@ -565,7 +575,7 @@ $site = lget($content, 'site', []);
 
         <!-- TAMPILAN FORM -->
         <div class="card-gms !pb-3 mb-3">
-          <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Isi Konten — Semua Section dalam Satu Daftar</p>
+          <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Form Isi: <?php echo htmlspecialchars(lget($sec, 'name', $activeKey)); ?></p>
           <div class="flex flex-wrap gap-2" id="admView">
             <button type="button" class="btn-switch btn-switch-active" data-adm-mode="filled"><i class="fa-solid fa-filter"></i> Hanya Terisi</button>
             <button type="button" class="btn-switch btn-switch-inactive" data-adm-mode="all"><i class="fa-solid fa-circle-plus"></i> Buka Semua</button>
@@ -574,39 +584,37 @@ $site = lget($content, 'site', []);
           <p class="hint-gms mb-0">Field yang belum diisi disembunyikan agar form ringkas. Pilih "Buka Semua" bila ingin mengisi field baru (mengosongkan kolom tidak menghapus nilai lama).</p>
         </div>
 
-        <form method="POST" action="<?php echo app_url('admin'); ?>" enctype="multipart/form-data">
+        <form method="POST" action="<?php echo app_url('admin?s=' . urlencode($activeKey)); ?>" enctype="multipart/form-data">
           <?php echo csrf_field(); ?>
           <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
           <input type="hidden" name="has_visibility" value="1">
           <input type="hidden" name="action" value="save">
-          <input type="hidden" name="section" value="__all">
-
-          <?php foreach ($sections as $sk => $s): ?>
+          <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
           <?php
-            $sSubRows = [];
-            $sSubDef = kb_subsection_def($sk);
-            if ($sSubDef) {
-              foreach ($sSubDef['blocks'] as $subSlug => $subBlock) {
-                $subCur = kb_get_sub($sk, $s, $subSlug);
-                foreach ($subBlock['fields'] as $sf) {
-                  $sSubRows[] = [
-                    'slug' => $subSlug,
-                    'block' => (string)lget($subBlock, 'label', (string)$subSlug),
-                    'icon' => (string)lget($subBlock, 'icon', 'fa-solid fa-file'),
-                    'cur' => $subCur,
-                    'field' => $sf,
-                  ];
-                }
+          $subRows = [];
+          $subDef = kb_subsection_def($activeKey);
+          if ($subDef) {
+            foreach ($subDef['blocks'] as $subSlug => $subBlock) {
+              $subCur = kb_get_sub($activeKey, $sec, $subSlug);
+              foreach ($subBlock['fields'] as $sf) {
+                $subRows[] = [
+                  'slug' => $subSlug,
+                  'block' => (string)lget($subBlock, 'label', (string)$subSlug),
+                  'icon' => (string)lget($subBlock, 'icon', 'fa-solid fa-file'),
+                  'cur' => $subCur,
+                  'field' => $sf,
+                ];
               }
             }
-            $sName = lget($s, 'name', $sk);
-            $spfx = 'sec_' . $sk . '_';
+          }
+          $spfx = 'sec_' . $activeKey . '_';
+          $sName = lget($sec, 'name', $activeKey);
           ?>
 
-          <!-- IDENTITAS :: <?php echo htmlspecialchars($sk); ?> -->
+          <!-- IDENTITAS -->
           <details class="adm-row adm-row-sec" data-has="1" open>
             <summary>
-              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($s, 'icon', 'fa-solid fa-file')); ?>"></i></span>
+              <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($sec, 'icon', 'fa-solid fa-file')); ?>"></i></span>
               <span class="adm-sum-label"><?php echo htmlspecialchars($sName); ?></span>
               <span class="adm-sum-hint">Identitas</span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
@@ -615,11 +623,11 @@ $site = lget($content, 'site', []);
               <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                 <div>
                   <label class="label-gms">Nama Section</label>
-                  <input type="text" name="<?php echo htmlspecialchars($spfx . 'name'); ?>" class="input-gms" value="<?php echo htmlspecialchars(lget($s, 'name')); ?>">
+                  <input type="text" name="<?php echo htmlspecialchars($spfx . 'name'); ?>" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'name')); ?>">
                 </div>
                 <div>
                   <label class="label-gms">Icon (Font Awesome class)</label>
-                  <input type="text" name="<?php echo htmlspecialchars($spfx . 'icon'); ?>" class="input-gms" value="<?php echo htmlspecialchars(lget($s, 'icon')); ?>" placeholder="fa-solid fa-book">
+                  <input type="text" name="<?php echo htmlspecialchars($spfx . 'icon'); ?>" class="input-gms" value="<?php echo htmlspecialchars(lget($sec, 'icon')); ?>" placeholder="fa-solid fa-book">
                 </div>
                 <div class="flex items-end">
                   <label class="flex items-center justify-between gap-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-4 py-3 cursor-pointer select-none w-full">
@@ -627,7 +635,7 @@ $site = lget($content, 'site', []);
                       <i class="fa-solid fa-eye text-[#0052cc]"></i> Tampil di halaman
                     </span>
                     <input type="checkbox" name="<?php echo htmlspecialchars($spfx . 'visible'); ?>" value="1" class="sr-only"
-                           <?php echo lget($s, 'visible', true) ? 'checked' : ''; ?>>
+                           <?php echo lget($sec, 'visible', true) ? 'checked' : ''; ?>>
                     <span class="switch"></span>
                   </label>
                 </div>
@@ -635,10 +643,10 @@ $site = lget($content, 'site', []);
             </div>
           </details>
 
-          <!-- KONTEN :: <?php echo htmlspecialchars($sk); ?> -->
-          <?php foreach (kb_content_fields($sk) as $cvField):
+          <!-- KONTEN SECTION -->
+          <?php foreach (kb_content_fields($activeKey) as $cvField):
             $cvMeta = kb_content_meta($cvField);
-            $cvVal = kb_field_value($s, $cvField);
+            $cvVal = kb_field_value($sec, $cvField);
             $cvLines = kb_lines_value($cvVal);
             $cvHas = $cvLines ? 1 : 0;
             $cvPre = is_array($cvVal) ? implode("\n", array_map(function ($x) {
@@ -648,7 +656,7 @@ $site = lget($content, 'site', []);
           <details class="adm-row" data-has="<?php echo $cvHas; ?>" <?php echo $cvHas ? 'open' : ''; ?>>
             <summary>
               <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($cvMeta['icon']); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sName . ' · ' . $cvMeta['label']); ?></span>
+              <span class="adm-sum-label"><?php echo htmlspecialchars($cvMeta['label']); ?></span>
               <span class="adm-sum-hint"><?php echo $cvHas ? count($cvLines) . ' baris' : 'kosong'; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
@@ -662,8 +670,8 @@ $site = lget($content, 'site', []);
           </details>
           <?php endforeach; ?>
 
-          <!-- SUBSEKSI :: <?php echo htmlspecialchars($sk); ?> (tiap field = satu baris) -->
-          <?php foreach ($sSubRows as $sr):
+          <!-- SUBSEKSI (tiap field = satu baris) -->
+          <?php foreach ($subRows as $sr):
             $sf = $sr['field'];
             $sfName = $sf[0];
             $sfType = $sf[1];
@@ -684,7 +692,7 @@ $site = lget($content, 'site', []);
           <details class="adm-row" data-has="<?php echo $sfHas; ?>" <?php echo $sfHas ? 'open' : ''; ?>>
             <summary>
               <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars($sr['icon']); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sName . ' · ' . $sr['block'] . ' · ' . $sfLabel); ?></span>
+              <span class="adm-sum-label"><?php echo htmlspecialchars($sr['block'] . ' · ' . $sfLabel); ?></span>
               <span class="adm-sum-hint"><?php echo $sfHas ? ($sfType === 'lines' ? count($sfLines) . ' baris' : 'terisi') : 'kosong'; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
@@ -702,16 +710,16 @@ $site = lget($content, 'site', []);
           </details>
           <?php endforeach; ?>
 
-          <!-- FIELD LEVEL SECTION :: <?php echo htmlspecialchars($sk); ?> (msj: cek kelulusan) -->
-          <?php foreach (kb_section_fields($sk) as $sf):
-            $sfv = lget($s, $sf['field'], []);
+          <!-- FIELD LEVEL SECTION (msj: cek kelulusan) -->
+          <?php foreach (kb_section_fields($activeKey) as $sf):
+            $sfv = lget($sec, $sf['field'], []);
             $sfLines2 = kb_lines_value($sfv);
             $sfHas2 = $sfLines2 ? 1 : 0;
           ?>
           <details class="adm-row" data-has="<?php echo $sfHas2; ?>" <?php echo $sfHas2 ? 'open' : ''; ?>>
             <summary>
               <span class="adm-sum-icon"><i class="<?php echo htmlspecialchars(lget($sf, 'icon', 'fa-solid fa-graduation-cap')); ?>"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sName . ' · ' . lget($sf, 'label', 'Informasi Kelulusan')); ?></span>
+              <span class="adm-sum-label"><?php echo htmlspecialchars(lget($sf, 'label', 'Informasi Kelulusan')); ?></span>
               <span class="adm-sum-hint"><?php echo $sfHas2 ? count($sfLines2) . ' baris' : 'kosong'; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
@@ -721,37 +729,37 @@ $site = lget($content, 'site', []);
           </details>
           <?php endforeach; ?>
 
-          <!-- LINK TUTORIAL :: <?php echo htmlspecialchars($sk); ?> (cgt) -->
-          <?php if (kb_has_links($sk)):
-            $linkHas = count(lget($s, 'links', [])) ? 1 : 0;
+          <!-- LINK TUTORIAL -->
+          <?php if (kb_has_links($activeKey)):
+            $linkHas = count(lget($sec, 'links', [])) ? 1 : 0;
           ?>
           <details class="adm-row" data-has="<?php echo $linkHas; ?>" <?php echo $linkHas ? 'open' : ''; ?>>
             <summary>
               <span class="adm-sum-icon"><i class="fa-solid fa-link"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sName . ' · Link Tutorial'); ?></span>
+              <span class="adm-sum-label">Link Tutorial</span>
               <span class="adm-sum-hint"><?php echo $linkHas ? 'terisi' : 'kosong'; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
             <div class="adm-row-body">
               <label class="label-gms">Tiap baris = satu link</label>
-              <textarea name="<?php echo htmlspecialchars($spfx . 'links'); ?>" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($s, 'links', []), 'label', 'url')); ?></textarea>
+              <textarea name="<?php echo htmlspecialchars($spfx . 'links'); ?>" class="input-gms" rows="4" data-row-editor="pairs" data-ph1="Label" data-ph2="URL"><?php echo htmlspecialchars(kb_encode_pairs(lget($sec, 'links', []), 'label', 'url')); ?></textarea>
             </div>
           </details>
           <?php endif; ?>
 
-          <!-- FAQ :: <?php echo htmlspecialchars($sk); ?> -->
-          <?php $faqHas = count(lget($s, 'faq', [])) ? 1 : 0; ?>
+          <!-- FAQ -->
+          <?php $faqHas = count(lget($sec, 'faq', [])) ? 1 : 0; ?>
           <details class="adm-row" data-has="<?php echo $faqHas; ?>" <?php echo $faqHas ? 'open' : ''; ?>>
             <summary>
               <span class="adm-sum-icon"><i class="fa-solid fa-circle-question"></i></span>
-              <span class="adm-sum-label"><?php echo htmlspecialchars($sName . ' · FAQ'); ?></span>
-              <span class="adm-sum-hint"><?php echo $faqHas ? count(lget($s, 'faq', [])) . ' item' : 'kosong'; ?></span>
+              <span class="adm-sum-label">FAQ</span>
+              <span class="adm-sum-hint"><?php echo $faqHas ? count(lget($sec, 'faq', [])) . ' item' : 'kosong'; ?></span>
               <i class="fa-solid fa-chevron-down adm-sum-caret"></i>
             </summary>
             <div class="adm-row-body">
               <label class="label-gms">Tiap baris = satu pasangan Tanya-Jawab</label>
               <textarea name="<?php echo htmlspecialchars($spfx . 'faq'); ?>" class="input-gms" rows="8" data-row-editor="pairs" data-ph1="Pertanyaan" data-ph2="Jawaban"><?php
-                $faqArr = lget($s, 'faq', []);
+                $faqArr = lget($sec, 'faq', []);
                 $faqLines = [];
                 foreach ($faqArr as $fq) {
                   $faqLines[] = lget($fq, 'q', '') . "\t" . lget($fq, 'a', '');
@@ -760,7 +768,6 @@ $site = lget($content, 'site', []);
               ?></textarea>
             </div>
           </details>
-          <?php endforeach; ?>
 
           <!-- SUBMIT -->
           <div class="card-gms flex flex-col sm:flex-row gap-3 items-center justify-between">
