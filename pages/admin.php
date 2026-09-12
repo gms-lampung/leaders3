@@ -619,7 +619,7 @@ $site = lget($content, 'site', []);
           <?php echo csrf_field(); ?>
           <input type="hidden" name="form_version" value="<?php echo ADMIN_FORM_VERSION; ?>">
           <input type="hidden" name="action" value="save">
-          <input type="hidden" name="section" value="<?php echo htmlspecialchars($activeKey); ?>">
+          <input type="hidden" name="section" value="__site">
           <?php render_site_settings(); ?>
           <div class="card-gms flex flex-col sm:flex-row gap-3 items-center justify-between">
             <p class="text-xs text-[#5e6d82] m-0">Perubahan langsung tampil di halaman publik setelah disimpan.</p>
