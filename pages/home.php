@@ -1,8 +1,8 @@
 <?php
 /* ============================================================
  * home.php — Knowledge Base Leaders 3 (tampilan publik).
- * Sumber data: get_leaders_content() — SAMA dengan leaders2.
- * Render konten: lib/kb.php (skema + renderer generik).
+ * Sumber data: get_kb_content() — gabungan leaders2 (konten lama, menang)
+ * + leaders3 (section baru & yang diambil alih). Render: lib/kb.php.
  * ============================================================ */
 
 require_once dirname(__DIR__) . '/lib/kb.php';
@@ -13,7 +13,7 @@ if (!function_exists('lget')) {
   }
 }
 
-$content = get_leaders_content();
+$content = get_kb_content();
 $site = lget($content, 'site', []);
 $sections = lget($content, 'sections', []);
 $admin = is_admin();

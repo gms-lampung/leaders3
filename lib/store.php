@@ -167,6 +167,47 @@ function save_leaders_content(array $content): bool {
   return store_save_data(STORE_K_CONTENT, 'leaders3_content.json', $content);
 }
 
+/** Data leaders2 (basis/konten lama) — dibaca saja, tidak pernah ditulis. */
+function get_leaders2_content(): array {
+  return store_get_data('gmsapp:leaders_content', 'leaders2_content.json', '');
+}
+
+/**
+ * Gabungkan sections leaders2 (dasar/menang) + leaders3 (baru / diambil alih).
+ * - slug hanya di leaders3 -> ikut tampil;
+ * - slug di leaders2 -> versi leaders2 menang, KECUALI versi leaders3
+ *   sudah diambil alih (flag _taken) -> versi leaders3 yang tampil.
+ */
+function kb_merge_sections(array $l2sections, array $l3sections): array {
+  $sections = $l2sections;
+  foreach ($l3sections as $slug => $sec) {
+    if (!isset($sections[$slug])) {
+      $sections[$slug] = $sec;      // section baru (hanya di leaders3)
+    } elseif (!empty($sec['_taken'])) {
+      $sections[$slug] = $sec;      // sudah diambil alih
+    }
+  }
+  return $sections;
+}
+
+/**
+ * Konten gabungan untuk TAMPILAN (home & admin sidebar/editor):
+ * - section yang ada di leaders2 tampil versi leaders2 (data lama menang);
+ * - section leaders3 dengan slug BARU ikut tampil;
+ * - section leaders3 yang diambil alih (ber-flag _taken) menimpa yang leaders2;
+ * - section leaders3 yang slug-nya sama dengan leaders2 TANPA _taken
+ *   diabaikan (tetap pakai versi leaders2) sampai diambil alih via admin.
+ * Site tetap memakai config leaders3 (sama dengan leaders2 & lebih lengkap).
+ */
+function get_kb_content(): array {
+  $l3 = get_leaders_content();
+  $l2 = get_leaders2_content();
+  $l2s = isset($l2['sections']) && is_array($l2['sections']) ? $l2['sections'] : [];
+  $l3s = isset($l3['sections']) && is_array($l3['sections']) ? $l3['sections'] : [];
+  $l3['sections'] = kb_merge_sections($l2s, $l3s);
+  return $l3;
+}
+
 function get_birthdays(): array {
   return store_get_data(STORE_K_BIRTHDAYS, 'birthdays.json', 'birthdays.json', false);
 }

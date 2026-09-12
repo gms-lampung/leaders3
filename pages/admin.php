@@ -1,16 +1,20 @@
 <?php
 /* ============================================================
  * admin.php — Panel admin Knowledge Base Leaders 3.
- * Kelola konten dari skema tunggal lib/kb.php (tambah/simpan
- * section). Data ditulis ke key Redis terpisah milik leaders3
- * (gmsapp:leaders3_content) — tidak mengganggu konten leaders2.
+ * Tampilan memakai gabungan leaders2 (konten lama, MENANG) +
+ * leaders3 (section baru & yang diambil alih). Tulis SELALU ke
+ * key leaders3 (gmsapp:leaders3_content) — leaders2 tidak pernah
+ * diubah. Section leaders2 yang diedit disalin ke leaders3
+ * (ambil alih) saat benar-benar ada perubahan.
  * ============================================================ */
 
 require_admin();
 
 require_once dirname(__DIR__) . '/lib/kb.php';
 
-$content = get_leaders_content();
+$l3 = get_leaders_content();
+$view = get_kb_content();
+$content = $l3;
 
 function lget($arr, $key, $default = '') {
   return isset($arr[$key]) ? $arr[$key] : $default;
@@ -140,6 +144,40 @@ function admin_save_section(array &$content, string $key): void {
   }
 }
 
+/** Basis editor untuk sebuah section: salinan leaders3 bila ada, selainnya gabungan (leaders2). */
+function admin_section_edit_base(array $l3, array $view, string $key): array {
+  return isset($l3['sections'][$key]) && is_array($l3['sections'][$key])
+    ? $l3['sections'][$key]
+    : ($view['sections'][$key] ?? []);
+}
+
+/**
+ * Simpan SATU section dari form aktif ke buffer leaders3 dengan aturan
+ * ambil-alih (copy-on-save):
+ *  - pemilik leaders2 yang TIDAK diubah -> dilewati (leaders2 tetap sumber);
+ *  - ada perubahan (teks besar / identitas) -> disalin ke leaders3, diberi
+ *    flag _taken, lalu admin_save_section() diterapkan;
+ *  - milik leaders3 -> admin_save_section() dengan flag _taken dipastikan set.
+ * Mengembalikan nama section bila tersimpan, '' bila dilewati.
+ */
+function admin_save_section_merged(array &$content, array $view, string $key): string {
+  $l3Sections = isset($content['sections']) && is_array($content['sections']) ? $content['sections'] : [];
+  $viewSec = isset($view['sections'][$key]) && is_array($view['sections'][$key]) ? $view['sections'][$key] : [];
+  $pfx = 'sec_' . $key . '_';
+
+  $txtNew = isset($_POST[$pfx . 'big_text']) ? (string)$_POST[$pfx . 'big_text'] : '';
+  $nameNew = isset($_POST[$pfx . 'name']) ? trim((string)$_POST[$pfx . 'name']) : (string)lget($viewSec, 'name', '');
+  $iconNew = isset($_POST[$pfx . 'icon']) ? trim((string)$_POST[$pfx . 'icon']) : (string)lget($viewSec, 'icon', '');
+  $visNew = isset($_POST['has_visibility'])
+    ? isset($_POST[$pfx . 'visible'])
+    : (bool)lget($viewSec, 'visible', true);
+
+  $r = kb_big_section_save($l3Sections, $key, $viewSec, $txtNew, $nameNew, $iconNew, $visNew);
+  if (!$r['changed'] || !is_array($r['section'])) return '';
+  $content['sections'][$key] = $r['section'];
+  return (string)lget($r['section'], 'name', $key);
+}
+
 /** Sidebar navigasi admin: Pengaturan + daftar section. */
 function render_admin_sidebar(array $sections, string $activeKey): void {
   $act = function (?string $k) use ($activeKey): string {
@@ -229,12 +267,12 @@ function render_site_settings(): void {
   <?php
 }
 
-$sections = lget($content, 'sections', []);
-$activeKey = isset($_GET['s']) ? $_GET['s'] : '';
+$sections = lget($view, 'sections', []);
+$activeKey = isset($_GET['s']) ? (string)$_GET['s'] : '';
 if (!isset($sections[$activeKey])) {
   $activeKey = $sections ? array_key_first($sections) : '';
 }
-$sec = $sections[$activeKey] ?? [];
+$sec = $activeKey === '' ? [] : admin_section_edit_base($l3, $view, $activeKey);
 $viewSites = isset($_GET['s']) && $_GET['s'] === '__site';
 
 $message = '';
@@ -268,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Slug section baru harus 2-50 karakter: huruf kecil, angka, atau underscore (tanpa spasi).';
       } elseif ($name === '') {
         $error = 'Nama section baru wajib diisi.';
-      } elseif (isset($content['sections'][$slug])) {
+      } elseif (isset($content['sections'][$slug]) || isset($view['sections'][$slug])) {
         $error = 'Slug "' . htmlspecialchars($slug) . '" sudah dipakai oleh section lain.';
       } elseif ($icon !== '' && !preg_match('/^[a-zA-Z0-9 _-]{2,80}$/', $icon)) {
         $error = 'Kelas ikon Font Awesome tidak valid (contoh: fa-solid fa-book).';
@@ -306,18 +344,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content['site']['footer_text'] = form_str($_POST, 'site_footer_text', lget($siteOld, 'footer_text'));
     $content['site']['copyright'] = form_str($_POST, 'site_copyright', lget($siteOld, 'copyright', 'GMS Lampung'));
 
-    // Simpan konten: form raksasa (section=__all) menulis SEMUA section
-    // sekaligus; form lama menulis satu section; form pengaturan (__site)
-    // hanya menyimpan pengaturan global (tidak membuat section).
+    // Simpan konten: form menulis SATU section aktif; pemilik leaders2
+    // hanya diambil alih (disalin ke leaders3) saat benar-benar berubah.
+    // Form pengaturan (__site) hanya menyimpan pengaturan global.
     $savedName = '';
-    if (isset($content['sections'][$postKey])) {
-      admin_save_section($content, $postKey);
-      $savedName = lget($content['sections'][$postKey], 'name', $postKey);
-    } elseif ($postKey === '__all') {
-      foreach (array_keys($content['sections']) as $sk) {
-        admin_save_section($content, $sk);
+    if ($postKey === '__all') {
+      $savedNames = [];
+      foreach (array_keys($view['sections']) as $sk) {
+        $nm = admin_save_section_merged($content, $view, $sk);
+        if ($nm !== '') $savedNames[] = $nm;
       }
-      $savedName = 'semua section';
+      $savedName = $savedNames ? 'semua section' : '';
+    } elseif ($postKey !== '' && $postKey !== '__site') {
+      $savedName = admin_save_section_merged($content, $view, $postKey);
     }
 
     if (!save_leaders_content($content)) {
@@ -328,9 +367,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         : 'Pengaturan halaman berhasil disimpan.';
     }
 
-    $sections = lget($content, 'sections', []);
-    $sec = $sections[$activeKey] ?? [];
-    $activeKey = $activeKey;
+    $l3 = get_leaders_content();
+    $view = get_kb_content();
+    $sections = lget($view, 'sections', []);
+    if (!isset($sections[$activeKey])) {
+      $activeKey = $sections ? array_key_first($sections) : '';
+    }
+    $sec = $activeKey === '' ? [] : admin_section_edit_base($l3, $view, $activeKey);
     }
     }
   }
@@ -606,6 +649,7 @@ $site = lget($content, 'site', []);
         <div class="card-gms !pb-3 mb-3">
           <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Form Isi: <?php echo htmlspecialchars(lget($sec, 'name', $activeKey)); ?></p>
           <p class="hint-gms mb-0">Semua konten kategori ini jadi <strong>satu field besar</strong>: tulis dengan penanda <code># nama</code>, simpan, lalu sistem memecahnya otomatis ke bagian-bagian yang tampil di halaman publik. Identitas section (nama, ikon, tampil) tetap di kolom paling atas.</p>
+          <p class="hint-gms mb-0 mt-1">Konten yang sudah ada di leaders2 tetap tampil dari leaders2 dan menang. Penambahan baru &amp; section yang Anda ubah lalu simpan di sini otomatis <strong>mengambil alih</strong> (disalin ke leaders3).</p>
         </div>
 
         <form method="POST" action="<?php echo app_url('admin?s=' . urlencode($activeKey)); ?>" enctype="multipart/form-data">

@@ -876,3 +876,44 @@ function kb_big_text_apply(string $key, array &$sec, string $text): void {
   if (!isset($seen['links']) && kb_has_links($key)) $sec['links'] = [];
   if (!isset($seen['faq'])) $sec['faq'] = [];
 }
+
+/**
+ * Ambil-alih & simpan SATU section dari teks besar + identitas (murni,
+ * tanpa $_POST / Redis). Dipakai admin (copy-on-save rules):
+ *  - pemilik leaders2 yang TIDAK diubah -> ['changed'=>false, 'section'=>null]
+ *    (data lama tetap sumber, sisa data leaders3 tidak diubah);
+ *  - ada perubahan -> section baru (basis: salinan leaders3 bila ada,
+ *    selain itu section tampilan/leaders2) + flag _taken=true.
+ */
+function kb_big_section_save(
+  array $l3Sections,
+  string $key,
+  array $viewSec,
+  string $postText,
+  string $postName,
+  string $postIcon,
+  bool $postVisible
+): array {
+  $exists = isset($l3Sections[$key]) && is_array($l3Sections[$key]);
+  $basis = $exists ? $l3Sections[$key] : $viewSec;
+
+  $txtOld = kb_big_text($key, $basis);
+  $txtNew = rtrim(str_replace(["\r\n", "\r"], "\n", $postText));
+
+  $identChanged = $postName !== (string)kb_lget($basis, 'name', '')
+    || $postIcon !== (string)kb_lget($basis, 'icon', '')
+    || $postVisible !== (bool)kb_lget($basis, 'visible', true);
+  $bigChanged = $txtNew !== $txtOld;
+
+  if (!$bigChanged && !$identChanged) {
+    return ['changed' => false, 'section' => null];
+  }
+
+  $sec = $basis;
+  kb_big_text_apply($key, $sec, $txtNew);
+  $sec['name'] = $postName;
+  $sec['icon'] = $postIcon;
+  $sec['visible'] = $postVisible;
+  $sec['_taken'] = true;
+  return ['changed' => true, 'section' => $sec];
+}
