@@ -478,7 +478,12 @@ function kb_render_faq(string $key, array $sec): void {
     echo '<button type="button" class="faq-q" onclick="toggleFaq(this)">';
     echo '<span>' . htmlspecialchars($q) . '</span><i class="fa-solid fa-chevron-down"></i>';
     echo '</button>';
-    echo '<div class="faq-a"><p>' . htmlspecialchars($a) . '</p></div>';
+    echo '<div class="faq-a">';
+    foreach (preg_split('/\r\n|\r|\n/', $a) as $ap) {
+      $ap = trim($ap);
+      if ($ap !== '') echo '<p>' . htmlspecialchars($ap) . '</p>';
+    }
+    echo '</div>';
     echo '</div>';
   }
   echo '</div></div>';
@@ -595,16 +600,30 @@ function kb_big_line_items(array $body): array {
 }
 
 /** Pasangan Kolom || Isi per baris (FAQ, link, dan pairs di subseksi).
- *  TAB tetap diterima untuk kompatibilitas data lama. */
+ *  TAB tetap diterima untuk kompatibilitas data lama. Baris TANPA pemisah
+ *  setelah sebuah pasangan dianggap LANJUTAN isi baris berikutnya
+ *  (mendukung jawaban/isi multi-baris), dipisah baris baru (\\n). */
 function kb_big_pair_items(array $body, string $k1, string $k2): array {
   $out = [];
+  $cur = null;
   foreach (kb_big_clean_lines($body) as $ln) {
-    $p = explode('||', $ln, 2);
-    if (count($p) !== 2) $p = explode("\t", $ln, 2);
+    $line = rtrim($ln);
+    if (trim($line) === '') continue;
+    $p = explode('||', $line, 2);
+    if (count($p) !== 2) $p = explode("\t", $line, 2);
     if (count($p) === 2) {
       $a = trim($p[0]);
       $b = trim($p[1]);
-      if ($a !== '') $out[] = [$k1 => $a, $k2 => $b];
+      if ($a !== '') {
+        $out[] = [$k1 => $a, $k2 => $b];
+        $cur = count($out) - 1;
+      }
+    } elseif ($cur !== null) {
+      // Lanjutan isi jawaban/kolom isi ke baris berikutnya.
+      $line = ltrim($line);
+      if ($line !== '') {
+        $out[$cur][$k2] = ($out[$cur][$k2] === '' ? '' : $out[$cur][$k2] . "\n") . $line;
+      }
     }
   }
   return $out;

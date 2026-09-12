@@ -812,6 +812,9 @@ body {
   border-radius: 12px;
   padding: 12px 14px;
 }
+.faq-a p + p {
+  margin-top: 8px;
+}
 
 .faq-item.is-open .faq-a {
   display: block;
