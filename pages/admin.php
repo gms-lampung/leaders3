@@ -678,7 +678,7 @@ $site = lget($content, 'site', []);
             </summary>
             <div class="adm-row-body">
               <textarea name="<?php echo htmlspecialchars($spfx . 'big_text'); ?>" class="input-gms big-konten" rows="30" spellcheck="false"><?php echo htmlspecialchars(kb_big_text($activeKey, $sec)); ?></textarea>
-              <p class="hint-gms mt-1"><strong>Cara pakai:</strong> tulis penanda <code># nama</code> di satu baris, lalu isinya di baris-baris berikutnya. Baris biasa = satu item (mis. satu syarat per baris). FAQ &amp; Link: <code>Kolom &lt;TAB&gt; Isi</code>. Subseksi: <code># sub: slug</code> lalu tiap field dengan <code>## nama</code>. Penanda yang tidak ditulis tidak diubah.</p>
+              <p class="hint-gms mt-1"><strong>Cara pakai:</strong> tulis penanda <code># nama</code> di satu baris, lalu isinya di baris-baris berikutnya. Baris biasa = satu item (mis. satu syarat per baris). FAQ &amp; Link: <code>Kolom || Isi</code> (dua pipa; TAB lama juga tetap terbaca). Subseksi: <code># sub: slug</code> lalu tiap field dengan <code>## nama</code>. Penanda yang tidak ditulis tidak diubah.</p>
               <details class="mt-2">
                 <summary class="text-xs font-bold text-[#5e6d82] cursor-pointer"><i class="fa-solid fa-list-ul mr-1"></i> Penanda yang tersedia di kategori ini</summary>
                 <p class="hint-gms mb-0 mt-1"><?php echo htmlspecialchars(implode(' ', $markerHint)); ?></p>

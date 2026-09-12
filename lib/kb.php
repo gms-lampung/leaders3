@@ -536,7 +536,7 @@ function kb_render_section(string $key, array $sec): void {
  *   # definisi              -> lines (satu item per baris)
  *   # sub: <slug>           -> blok subseksi
  *     ## <nama field>       -> isi satu field blok tersebut
- *   # links / # faq         -> pasangan Kolom<TAB>Isi per baris
+ *   # links / # faq         -> pasangan Kolom || Isi per baris
  * ============================================================ */
 
 /** Pecah teks besar menjadi [['m' => penanda, 'b' => baris], ...]. */
@@ -580,11 +580,13 @@ function kb_big_line_items(array $body): array {
   return $out;
 }
 
-/** Pasangan Kolom<TAB>Isi (untuk FAQ, link, dan pairs di subseksi). */
+/** Pasangan Kolom || Isi per baris (FAQ, link, dan pairs di subseksi).
+ *  TAB tetap diterima untuk kompatibilitas data lama. */
 function kb_big_pair_items(array $body, string $k1, string $k2): array {
   $out = [];
   foreach (kb_big_clean_lines($body) as $ln) {
-    $p = explode("\t", $ln, 2);
+    $p = explode('||', $ln, 2);
+    if (count($p) !== 2) $p = explode("\t", $ln, 2);
     if (count($p) === 2) {
       $a = trim($p[0]);
       $b = trim($p[1]);
@@ -644,7 +646,7 @@ function kb_big_text(string $key, array $sec): string {
           $items = is_array($v) ? $v : [];
           $pl = [];
           foreach ($items as $it) {
-            if (is_array($it)) $pl[] = (string)kb_lget($it, $k1) . "\t" . (string)kb_lget($it, $k2);
+            if (is_array($it)) $pl[] = (string)kb_lget($it, $k1) . '||' . (string)kb_lget($it, $k2);
           }
           $body = $pl ? implode("\n", $pl) : '';
         } elseif ($ftype === 'int') {
@@ -669,7 +671,7 @@ function kb_big_text(string $key, array $sec): string {
     $pl = [];
     if (is_array($items)) {
       foreach ($items as $it) {
-        if (is_array($it)) $pl[] = (string)kb_lget($it, 'label') . "\t" . (string)kb_lget($it, 'url');
+        if (is_array($it)) $pl[] = (string)kb_lget($it, 'label') . '||' . (string)kb_lget($it, 'url');
       }
     }
     $groups[] = ['# links', $pl ? implode("\n", $pl) : ''];
@@ -679,7 +681,7 @@ function kb_big_text(string $key, array $sec): string {
   $fl = [];
   if (is_array($faq)) {
     foreach ($faq as $it) {
-      if (is_array($it)) $fl[] = (string)kb_lget($it, 'q') . "\t" . (string)kb_lget($it, 'a');
+      if (is_array($it)) $fl[] = (string)kb_lget($it, 'q') . '||' . (string)kb_lget($it, 'a');
     }
   }
   $groups[] = ['# faq', $fl ? implode("\n", $fl) : ''];
