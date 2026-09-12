@@ -13,9 +13,11 @@
  * POST tidak kosong (keep-old), dan tidak membuat key baru.
  *
  * Bagian skema/parser TIDAK diubah dari leaders2 karena memakai
- * gmsapp:leaders_content yang SAMA. Hanya renderer publik yang
- * diganti menjadi markup semantik (digerakkan public/css/app.css)
- * agar tampilan leaders3 modern & mudah disesuaikan.
+ * bentuk konten yang sama. Data leaders3 disimpan di key Redis
+ * terpisah (gmsapp:leaders3_content) agar tidak saling menimpa
+ * konten leaders2. Renderer publik diganti menjadi markup semantik
+ * (digerakkan public/css/app.css) agar tampilan leaders3 modern
+ * & mudah disesuaikan.
  * ============================================================ */
 
 function kb_lget($arr, $key, $default = '') {

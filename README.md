@@ -1,6 +1,6 @@
 # Knowledge Base Leaders 3 (GMS Lampung)
 
-Tampilan baru Knowledge Base Leaders GMS Lampung dengan desain **modern & bersih** (tema teal, kartu konten besar, badge & ikon, mobile-first). Data diambil dari **sumber yang SAMA** dengan leaders2 — Upstash Redis (`gmsapp:leaders_content`). Edit konten di salah satu aplikasi langsung tampil di keduanya.
+Tampilan baru Knowledge Base Leaders GMS Lampung dengan desain **modern & bersih** (tema teal, kartu konten besar, badge & ikon, mobile-first). Data leaders3 disimpan di Upstash Redis pada key **`gmsapp:leaders3_content`** — **key terpisah** dari leaders2 (`gmsapp:leaders_content`) sehingga isi konten kedua aplikasi tidak saling menimpa. Data awal sengaja **kosong**: kategori & konten diisi lewat admin (tombol **+ Tambah Section**).
 
 ## Stack
 

@@ -8,14 +8,14 @@
  * sehingga tetap bisa dikembangkan tanpa Redis.
  *
  * Key Redis:
- *   gmsapp:leaders_content  -> content.json leaders
+ *   gmsapp:leaders3_content -> konten leaders3 (key KHUSUS, terpisah dari leaders2)
  *   gmsapp:birthday_data    -> daftar birthday/anniversary
  *   gmsapp:settings         -> pengaturan app (birthday_visible dll.)
  *   gmsapp:reminder_sent    -> penanda tanggal email reminder terkirim
  *   gmsapp:throttle:<ip>    -> pembatas percobaan login admin
  * ============================================================ */
 
-define('STORE_K_CONTENT',   'gmsapp:leaders_content');
+define('STORE_K_CONTENT',   'gmsapp:leaders3_content');
 define('STORE_K_BIRTHDAYS', 'gmsapp:birthday_data');
 define('STORE_K_SETTINGS',  'gmsapp:settings');
 define('STORE_K_FLAG',      'gmsapp:reminder_sent');
@@ -160,11 +160,11 @@ function store_save_data(string $redisKey, string $localName, array $data, bool 
 /* ---------------- API tingkat tinggi ---------------- */
 
 function get_leaders_content(): array {
-  return store_get_data(STORE_K_CONTENT, 'leaders_content.json', 'content.json');
+  return store_get_data(STORE_K_CONTENT, 'leaders3_content.json', 'content.json');
 }
 
 function save_leaders_content(array $content): bool {
-  return store_save_data(STORE_K_CONTENT, 'leaders_content.json', $content);
+  return store_save_data(STORE_K_CONTENT, 'leaders3_content.json', $content);
 }
 
 function get_birthdays(): array {

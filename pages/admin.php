@@ -2,8 +2,8 @@
 /* ============================================================
  * admin.php — Panel admin Knowledge Base Leaders 3.
  * Kelola konten dari skema tunggal lib/kb.php (tambah/simpan
- * section). Data ditulis ke gmsapp:leaders_content yang SAMA
- * dengan leaders2 (satu sumber data).
+ * section). Data ditulis ke key Redis terpisah milik leaders3
+ * (gmsapp:leaders3_content) — tidak mengganggu konten leaders2.
  * ============================================================ */
 
 require_admin();
@@ -586,6 +586,22 @@ $site = lget($content, 'site', []);
 
         <?php else: ?>
 
+        <?php if ($activeKey === ''): ?>
+
+        <!-- KOSONG: belum ada kategori -->
+        <div class="card-gms text-center py-8">
+          <div class="mx-auto w-14 h-14 rounded-2xl bg-[#e0edff] flex items-center justify-center mb-3">
+            <i class="fa-solid fa-folder-plus text-[#0052cc] text-2xl"></i>
+          </div>
+          <p class="label-gms mb-1">Belum ada kategori</p>
+          <p class="hint-gms mb-4 max-w-sm mx-auto">Database masih kosong. Buat kategori pertama lewat tombol <strong>+ Tambah Section</strong> di menu samping, lalu isi kontennya di form yang muncul.</p>
+          <button type="button" class="btn-gms-pill" onclick="document.getElementById('sbAddBtn').dispatchEvent(new Event('click')); return false;">
+            <i class="fa-solid fa-plus"></i> Tambah Kategori Pertama
+          </button>
+        </div>
+
+        <?php else: ?>
+
         <!-- TAMPILAN FORM -->
         <div class="card-gms !pb-3 mb-3">
           <p class="label-gms mb-2"><i class="fa-solid fa-file-pen mr-1 text-[#0052cc]"></i> Form Isi: <?php echo htmlspecialchars(lget($sec, 'name', $activeKey)); ?></p>
@@ -679,6 +695,7 @@ $site = lget($content, 'site', []);
           </div>
         </form>
 
+        <?php endif; ?>
         <?php endif; ?>
       </div>
     </div>
