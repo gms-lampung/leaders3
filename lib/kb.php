@@ -508,6 +508,19 @@ function kb_render_section(string $key, array $sec): void {
     if (in_array($field, ['intro', 'link_url', 'link_label', 'tutup', 'tutup2'], true)) continue;
     kb_render_content_card($key, $field, $sec);
   }
+  foreach (kb_lget(kb_lget($sec, 'content', []), 'custom', []) as $cb) {
+    if (!is_array($cb)) continue;
+    $cbTitle = (string)kb_lget($cb, 'title', 'Informasi');
+    $cbText = trim((string)kb_lget($cb, 'text', ''));
+    if ($cbText === '') continue;
+    kb_card_open('fa-solid fa-note-sticky', $cbTitle);
+    echo '<div class="kb-text">';
+    foreach (preg_split('/\r\n|\r|\n/', $cbText) as $cbPara) {
+      $cbPara = trim($cbPara);
+      if ($cbPara !== '') echo '<p>' . htmlspecialchars($cbPara) . '</p>';
+    }
+    echo '</div></div>';
+  }
   kb_render_subsections($key, $sec);
   kb_render_closing($sec);
   kb_render_faq($key, $sec);
@@ -537,6 +550,7 @@ function kb_render_section(string $key, array $sec): void {
  *   # sub: <slug>           -> blok subseksi
  *     ## <nama field>       -> isi satu field blok tersebut
  *   # links / # faq         -> pasangan Kolom || Isi per baris
+ *   # <penanda lain bebas>  -> blok isi bebas (judul = nama penanda)
  * ============================================================ */
 
 /** Pecah teks besar menjadi [['m' => penanda, 'b' => baris], ...]. */
@@ -624,6 +638,15 @@ function kb_big_text(string $key, array $sec): string {
     }
   }
 
+  // Penanda bebas (custom blocks): '# <judul>' dijadikan blok isi bebas.
+  foreach (kb_lget($content, 'custom', []) as $cbSlug => $cb) {
+    if (!is_array($cb)) continue;
+    $groups[] = [
+      '# ' . (string)kb_lget($cb, 'title', (string)$cbSlug),
+      (string)kb_lget($cb, 'text', ''),
+    ];
+  }
+
   $subDef = kb_subsection_def($key);
   if ($subDef) {
     $container = $subDef['scope'] === 'content'
@@ -698,6 +721,8 @@ function kb_big_text(string $key, array $sec): string {
 /** Terapkan teks besar kembali ke struktur section (keep-old per penanda). */
 function kb_big_text_apply(string $key, array &$sec, string $text): void {
   if (!isset($sec['content']) || !is_array($sec['content'])) $sec['content'] = [];
+  // Blok bebas dibangun ulang dari teks setiap simpan (hapus = hilang).
+  $sec['content']['custom'] = [];
 
   $subDef = kb_subsection_def($key);
   foreach (kb_big_chunks($text) as $c) {
@@ -794,12 +819,24 @@ function kb_big_text_apply(string $key, array &$sec, string $text): void {
     }
 
     // Field level-section (msj: cek_kelulusan)
+    $isSectionField = false;
     foreach (kb_section_fields($key) as $sf) {
       if ($sf['field'] === $marker) {
+        $isSectionField = true;
         $sec[$marker] = $sf['type'] === 'lines'
           ? kb_big_line_items($body)
           : kb_big_clean_text($body);
       }
     }
+    if ($isSectionField) continue;
+
+    // Penanda bebas -> blok isi bebas (judul = nama penanda)
+    $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $marker));
+    $slug = trim($slug, '-');
+    if ($slug === '') $slug = 'blok';
+    $sec['content']['custom'][$slug] = [
+      'title' => $marker,
+      'text' => kb_big_clean_text($body),
+    ];
   }
 }
