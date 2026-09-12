@@ -541,7 +541,7 @@ function kb_render_section(string $key, array $sec): void {
  * dengan penanda baris `# nama`. Saat disimpan, penanda dipecah
  * kembali ke struktur lama sehingga halaman publik & data Redis
  * (dipakai juga leaders2) tidak berubah. Penanda yang TIDAK ada
- * di teks tidak mengubah konten lama (keep-old).
+ * di teks ikut DIKOSONGKAN (hapus penanda dari teks = hapus isi).
  *
  * Format:
  *   # intro                 -> text
@@ -718,16 +718,20 @@ function kb_big_text(string $key, array $sec): string {
   return implode("\n\n", $out);
 }
 
-/** Terapkan teks besar kembali ke struktur section (keep-old per penanda). */
+/** Terapkan teks besar kembali ke struktur section.
+ *  Authoritatif: penanda yang tidak ada di teks ikut DIKOSONGKAN
+ *  (menghapus penanda dari teks = menghapus isinya). */
 function kb_big_text_apply(string $key, array &$sec, string $text): void {
   if (!isset($sec['content']) || !is_array($sec['content'])) $sec['content'] = [];
   // Blok bebas dibangun ulang dari teks setiap simpan (hapus = hilang).
   $sec['content']['custom'] = [];
+  $seen = [];
 
   $subDef = kb_subsection_def($key);
   foreach (kb_big_chunks($text) as $c) {
     $marker = $c['m'];
     $body = $c['b'];
+    $seen[$marker] = true;
 
     if ($marker === 'link') {
       $lines = kb_big_clean_lines($body);
@@ -839,4 +843,36 @@ function kb_big_text_apply(string $key, array &$sec, string $text): void {
       'text' => kb_big_clean_text($body),
     ];
   }
+
+  // Pass pengosongan: penanda yang tidak ada di teks => kosongkan.
+  foreach (kb_content_fields($key) as $f) {
+    if ($f === 'link_url' || $f === 'link_label') continue;
+    if (isset($seen[$f])) continue;
+    $meta = kb_content_meta($f);
+    $sec['content'][$f] = $meta['type'] === 'lines' ? [] : '';
+  }
+  if (!isset($seen['link'])) {
+    $sec['content']['link_url'] = '';
+    $sec['content']['link_label'] = '';
+  }
+  if ($subDef) {
+    foreach ($subDef['blocks'] as $slug => $block) {
+      if (isset($seen['sub: ' . $slug])) continue;
+      if ($subDef['scope'] === 'content') {
+        if (!isset($sec['content']['subsections']) || !is_array($sec['content']['subsections'])) {
+          $sec['content']['subsections'] = [];
+        }
+        $sec['content']['subsections'][$slug] = [];
+      } else {
+        if (!isset($sec['subsections']) || !is_array($sec['subsections'])) $sec['subsections'] = [];
+        $sec['subsections'][$slug] = [];
+      }
+    }
+  }
+  foreach (kb_section_fields($key) as $sf) {
+    if (isset($seen[$sf['field']])) continue;
+    $sec[$sf['field']] = $sf['type'] === 'lines' ? [] : '';
+  }
+  if (!isset($seen['links']) && kb_has_links($key)) $sec['links'] = [];
+  if (!isset($seen['faq'])) $sec['faq'] = [];
 }
