@@ -82,6 +82,12 @@ switch ($path) {
     require dirname(__DIR__) . '/pages/login.php';
     break;
 
+  case 'oauth/google':
+  case 'oauth/google/start':
+  case 'oauth/google/callback':
+    require dirname(__DIR__) . '/pages/oauth_google.php';
+    break;
+
   case 'logout':
     admin_logout();
     app_redirect('');

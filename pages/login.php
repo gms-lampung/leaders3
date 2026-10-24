@@ -7,7 +7,19 @@ if (is_admin()) {
   app_redirect('admin');
 }
 
+$oauthErr = isset($_GET['oauth_err']) ? (string)$_GET['oauth_err'] : '';
+$oauthMsgs = [
+  'config'     => 'SSO Google belum dikonfigurasi di server (env GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).',
+  'state'      => 'Sesi login Google kedaluwarsa atau tidak valid. Silakan coba lagi.',
+  'token'      => 'Gagal menukar kode otorisasi dengan Google. Silakan coba lagi.',
+  'userinfo'   => 'Gagal mengambil profil akun Google. Silakan coba lagi.',
+  'unverified' => 'Email akun Google Anda belum terverifikasi oleh Google.',
+  'denied'     => 'Akun Google ini tidak terdaftar sebagai admin.',
+];
 $error = '';
+if (isset($oauthMsgs[$oauthErr])) $error = $oauthMsgs[$oauthErr];
+$googleOn = google_oauth_configured();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_ok()) {
     $error = 'Sesi kedaluwarsa. Muat ulang halaman lalu coba lagi.';
@@ -60,6 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($error): ?>
         <div class="mb-3 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.85rem] font-semibold text-red-600">
           <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($googleOn): ?>
+        <a href="<?php echo app_url('oauth/google/start'); ?>"
+           class="w-full inline-flex items-center justify-center gap-2 rounded-full border border-[#d0d7de] bg-white px-4 py-2.5 text-[0.85rem] font-semibold text-[#18233b] transition hover:bg-[#f4f6fa]">
+          <i class="fa-brands fa-google text-[#DB4437]"></i> Masuk dengan Google
+        </a>
+        <div class="my-3 flex items-center gap-2 text-[0.72rem] text-[#5e6d82]">
+          <span class="h-px flex-1 bg-[#e2e8f0]"></span> atau <span class="h-px flex-1 bg-[#e2e8f0]"></span>
         </div>
       <?php endif; ?>
 

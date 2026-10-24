@@ -89,6 +89,108 @@ function require_admin(): void {
   }
 }
 
+/* ------------------- SSO Google (OAuth2 manual, tanpa library) -------------------
+ * Env:
+ *   GOOGLE_CLIENT_ID        : client ID dari Google Cloud Console (wajib utk SSO)
+ *   GOOGLE_CLIENT_SECRET    : client secret (wajib utk SSO)
+ *   APP_ADMIN_EMAILS        : allowlist email admin, pisah dgn koma/spasi (wajib)
+ *   APP_PUBLIC_URL          : URL publik app (opsional; default dari request)
+ *   APP_GOOGLE_REDIRECT_URI : override redirect URI (opsional)
+ * Redirect URI yang wajib didaftarkan di OAuth client:
+ *   <APP_PUBLIC_URL>/oauth/google/callback
+ * Sesi tetap memakai cookie gmsa_auth yang sama dengan login PIN.
+ * ============================================================================== */
+
+const GOOGLE_STATE_COOKIE = 'gmsa_oauth_state';
+
+function google_oauth_configured(): bool {
+  return app_env('GOOGLE_CLIENT_ID') !== '' && app_env('GOOGLE_CLIENT_SECRET') !== '';
+}
+
+/** URL publik aplikasi (env APP_PUBLIC_URL menang; bila kosong dari request). */
+function app_public_base(): string {
+  $pub = rtrim(app_env('APP_PUBLIC_URL', ''), '/');
+  if ($pub !== '') return $pub;
+  $scheme = https_on() ? 'https' : 'http';
+  $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+  return $scheme . '://' . $host;
+}
+
+/** redirect_uri SSO — wajib sama persis dengan yang terdaftar di Google. */
+function google_redirect_uri(): string {
+  $override = trim(app_env('APP_GOOGLE_REDIRECT_URI'));
+  if ($override !== '') return $override;
+  return app_public_base() . app_base_path() . '/oauth/google/callback';
+}
+
+/** Daftar email admin (lowercase) dari env APP_ADMIN_EMAILS. */
+function google_admin_emails(): array {
+  $list = [];
+  foreach (preg_split('/[\s,;]+/', (string)app_env('APP_ADMIN_EMAILS')) as $e) {
+    $e = mb_strtolower(trim($e));
+    if ($e !== '') $list[] = $e;
+  }
+  return $list;
+}
+
+/** Terbitkan cookie admin utk email yang lolos allowlist. Return '' bila sukses. */
+function admin_login_email(string $email): string {
+  $email = mb_strtolower(trim($email));
+  $list = google_admin_emails();
+  if (!$list) return 'Allowlist admin belum diisi di server (env APP_ADMIN_EMAILS).';
+  if (!in_array($email, $list, true)) return 'Email ' . $email . ' tidak terdaftar sebagai admin.';
+  $exp = time() + AUTH_TTL;
+  setcookie(AUTH_COOKIE, $exp . '.' . auth_sign($exp), [
+    'expires'  => $exp,
+    'path'     => '/',
+    'httponly' => true,
+    'samesite' => 'Lax',
+    'secure'   => https_on(),
+  ]);
+  return '';
+}
+
+/** Redirect ke consent Google (state HMAC + nonce, berlaku 10 menit). */
+function google_oauth_start(): void {
+  if (!google_oauth_configured()) {
+    app_redirect('login?oauth_err=config');
+  }
+  $exp   = time() + 600;
+  $nonce = bin2hex(random_bytes(16));
+  $sig   = hash_hmac('sha256', 'oauth_state|' . $exp . '|' . $nonce, auth_secret());
+  $state = $exp . '.' . $nonce . '.' . $sig;
+  setcookie(GOOGLE_STATE_COOKIE, $state, [
+    'expires'  => $exp,
+    'path'     => '/',
+    'httponly' => true,
+    'samesite' => 'Lax',
+    'secure'   => https_on(),
+  ]);
+  $q = http_build_query([
+    'client_id'     => app_env('GOOGLE_CLIENT_ID'),
+    'redirect_uri'  => google_redirect_uri(),
+    'response_type' => 'code',
+    'scope'         => 'openid email profile',
+    'state'         => $state,
+    'access_type'   => 'online',
+    'prompt'        => 'select_account',
+  ]);
+  header('Location: https://accounts.google.com/o/oauth2/v2/auth?' . $q);
+  exit;
+}
+
+/** Validasi state OAuth (cookie vs query, expiry, dan tanda tangan HMAC). */
+function google_oauth_state_ok(string $state): bool {
+  if ($state === '' || !isset($_COOKIE[GOOGLE_STATE_COOKIE])) return false;
+  if (!hash_equals((string)$_COOKIE[GOOGLE_STATE_COOKIE], $state)) return false;
+  $parts = explode('.', $state, 3);
+  if (count($parts) !== 3) return false;
+  [$exp, $nonce, $sig] = $parts;
+  if (!ctype_digit($exp) || (int)$exp < time()) return false;
+  $calc = hash_hmac('sha256', 'oauth_state|' . (int)$exp . '|' . $nonce, auth_secret());
+  return hash_equals($calc, $sig);
+}
+
 /* ------------------- CSRF (berbasis cookie) ------------------- */
 
 function csrf_token(): string {
