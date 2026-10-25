@@ -65,19 +65,13 @@ function admin_login(string $pin): string {
   }
   login_throttle_save(['fails' => 0, 'blocked_until' => 0]);
   $exp = time() + AUTH_TTL;
-  setcookie(AUTH_COOKIE, $exp . '.' . auth_sign($exp), [
-    'expires'  => $exp,
-    'path'     => '/',
-    'httponly' => true,
-    'samesite' => 'Lax',
-    'secure'   => https_on(),
-  ]);
+  header('Set-Cookie: ' . AUTH_COOKIE . '=' . urlencode($exp . '.' . auth_sign($exp)) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=' . AUTH_TTL . '; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
   return '';
 }
 
 function admin_logout(): void {
   if (isset($_COOKIE[AUTH_COOKIE])) {
-    setcookie(AUTH_COOKIE, '', ['expires' => time() - 42000, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => https_on()]);
+    header('Set-Cookie: ' . AUTH_COOKIE . '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
   }
 }
 
@@ -140,13 +134,7 @@ function admin_login_email(string $email): string {
   if (!$list) return 'Allowlist admin belum diisi di server (env APP_ADMIN_EMAILS).';
   if (!in_array($email, $list, true)) return 'Email ' . $email . ' tidak terdaftar sebagai admin.';
   $exp = time() + AUTH_TTL;
-  setcookie(AUTH_COOKIE, $exp . '.' . auth_sign($exp), [
-    'expires'  => $exp,
-    'path'     => '/',
-    'httponly' => true,
-    'samesite' => 'Lax',
-    'secure'   => https_on(),
-  ]);
+  header('Set-Cookie: ' . AUTH_COOKIE . '=' . urlencode($exp . '.' . auth_sign($exp)) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=' . AUTH_TTL . '; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
   return '';
 }
 
@@ -159,13 +147,7 @@ function google_oauth_start(): void {
   $nonce = bin2hex(random_bytes(16));
   $sig   = hash_hmac('sha256', 'oauth_state|' . $exp . '|' . $nonce, auth_secret());
   $state = $exp . '.' . $nonce . '.' . $sig;
-  setcookie(GOOGLE_STATE_COOKIE, $state, [
-    'expires'  => $exp,
-    'path'     => '/',
-    'httponly' => true,
-    'samesite' => 'Lax',
-    'secure'   => https_on(),
-  ]);
+  header('Set-Cookie: ' . GOOGLE_STATE_COOKIE . '=' . urlencode($state) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=600; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
   $q = http_build_query([
     'client_id'     => app_env('GOOGLE_CLIENT_ID'),
     'redirect_uri'  => google_redirect_uri(),
@@ -196,13 +178,7 @@ function google_oauth_state_ok(string $state): bool {
 function csrf_token(): string {
   if (empty($_COOKIE['gmsa_csrf'])) {
     $tok = bin2hex(random_bytes(32));
-    setcookie('gmsa_csrf', $tok, [
-      'expires'  => time() + 86400 * 7,
-      'path'     => '/',
-      'httponly' => true,
-      'samesite' => 'Lax',
-      'secure'   => https_on(),
-    ]);
+    header('Set-Cookie: gmsa_csrf=' . urlencode($tok) . '; expires=' . gmdate('D, d M Y H:i:s', time() + 86400 * 7) . ' GMT; Max-Age=' . (86400 * 7) . '; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
     $_COOKIE['gmsa_csrf'] = $tok; // tersedia untuk request saat ini juga
   }
   return $_COOKIE['gmsa_csrf'];

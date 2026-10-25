@@ -19,13 +19,7 @@ if ($code === '' || $state === '') {
 if (!google_oauth_state_ok($state)) {
   app_redirect('login?oauth_err=state');
 }
-setcookie(GOOGLE_STATE_COOKIE, '', [
-  'expires'  => time() - 42000,
-  'path'     => '/',
-  'httponly' => true,
-  'samesite' => 'Lax',
-  'secure'   => https_on(),
-]);
+header('Set-Cookie: ' . GOOGLE_STATE_COOKIE . '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
 
 /* --------- Tukar authorization code -> access token --------- */
 [$tokCode, $tokRes] = store_http('POST', 'https://oauth2.googleapis.com/token', [
