@@ -32,13 +32,55 @@ function auth_sign(int $exp): string {
   return hash_hmac('sha256', 'admin|' . $exp, auth_secret());
 }
 
+function sso_key(): string {
+  $s = app_env('GOOGLE_CLIENT_SECRET');
+  if ($s === '') $s = app_env('APP_ADMIN_PIN', 'gms-lampung');
+  return hash('sha256', 'gms-sso|' . $s);
+}
+
+function sso_set(string $email): void {
+  $exp = time() + 43200;
+  $email = mb_strtolower(trim($email));
+  $payload = $email . '|' . $exp;
+  $sig = hash_hmac('sha256', $payload, sso_key());
+  $val = base64_encode($payload) . '.' . $sig;
+  header('Set-Cookie: gms_sso=' . urlencode($val) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=43200; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
+}
+
+function sso_get(): string {
+  $c = $_COOKIE['gms_sso'] ?? '';
+  $parts = explode('.', $c, 2);
+  if (count($parts) !== 2) return '';
+  $payload = base64_decode($parts[0], true);
+  if ($payload === false) return '';
+  $pp = explode('|', $payload, 2);
+  if (count($pp) !== 2 || !ctype_digit($pp[1])) return '';
+  $email = $pp[0];
+  $exp = (int)$pp[1];
+  if ($exp < time()) return '';
+  $sig = hash_hmac('sha256', $payload, sso_key());
+  if (!hash_equals($sig, $parts[1])) return '';
+  return $email;
+}
+
 function is_admin(): bool {
-  if (!isset($_COOKIE[AUTH_COOKIE])) return false;
+  if (!isset($_COOKIE[AUTH_COOKIE])) {
+    if (sso_get() !== '') return true;
+    return false;
+  }
   $parts = explode('.', (string)$_COOKIE[AUTH_COOKIE], 2);
-  if (count($parts) !== 2) return false;
+  if (count($parts) !== 2) {
+    if (sso_get() !== '') return true;
+    return false;
+  }
   [$exp, $sig] = $parts;
-  if (!ctype_digit((string)$exp) || (int)$exp < time()) return false;
-  return hash_equals(auth_sign((int)$exp), (string)$sig);
+  if (!ctype_digit((string)$exp) || (int)$exp < time()) {
+    if (sso_get() !== '') return true;
+    return false;
+  }
+  if (hash_equals(auth_sign((int)$exp), (string)$sig)) return true;
+  if (sso_get() !== '') return true;
+  return false;
 }
 
 /**
@@ -66,6 +108,7 @@ function admin_login(string $pin): string {
   login_throttle_save(['fails' => 0, 'blocked_until' => 0]);
   $exp = time() + AUTH_TTL;
   header('Set-Cookie: ' . AUTH_COOKIE . '=' . urlencode($exp . '.' . auth_sign($exp)) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=' . AUTH_TTL . '; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
+  sso_set('admin');
   return '';
 }
 
@@ -135,6 +178,7 @@ function admin_login_email(string $email): string {
   if (!in_array($email, $list, true)) return 'Email ' . $email . ' tidak terdaftar sebagai admin.';
   $exp = time() + AUTH_TTL;
   header('Set-Cookie: ' . AUTH_COOKIE . '=' . urlencode($exp . '.' . auth_sign($exp)) . '; expires=' . gmdate('D, d M Y H:i:s', $exp) . ' GMT; Max-Age=' . AUTH_TTL . '; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
+  sso_set($email);
   return '';
 }
 
