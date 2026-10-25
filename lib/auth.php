@@ -116,6 +116,8 @@ function admin_logout(): void {
   if (isset($_COOKIE[AUTH_COOKIE])) {
     header('Set-Cookie: ' . AUTH_COOKIE . '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
   }
+  // Hapus cookie SSO lintas app
+  header('Set-Cookie: gms_sso=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; domain=.gmslampung.online; HttpOnly; SameSite=Lax' . (https_on() ? '; Secure' : ''), false);
 }
 
 /** Paksa halaman hanya untuk admin. Redirect ke /login bila belum masuk. */
